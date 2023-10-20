@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "logging.hpp"
 
 #include <cstring>
 #include <iostream>
@@ -26,7 +27,6 @@ AST::AST(syntax_tree *s) {
 ASTNode *AST::transform_node_iter(syntax_tree_node *n) {
     if (_STR_EQ(n->name, "program")) {
         auto node = new ASTProgram();
-
         // flatten declaration list
         std::stack<syntax_tree_node *> s;
         auto list_ptr = n->children[0];
