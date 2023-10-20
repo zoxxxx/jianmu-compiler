@@ -28,14 +28,14 @@ void yyerror(const char *s);
 syntax_tree_node *node(const char *node_name, int children_num, ...);
 %}
 
-/* TODO: Complete this definition.
+/*  Complete this definition.
    Hint: See pass_node(), node(), and syntax_tree.h.
          Use forward declaring. */
 %union {
     struct _syntax_tree_node *node;
 }
 
-/* TODO: Your tokens here. */
+/* Your tokens here. */
 %token <node> ERROR
 
 %token <node> LP RP LBRACK RBRACK
@@ -72,7 +72,7 @@ syntax_tree_node *node(const char *node_name, int children_num, ...);
 %start program
 
 %%
-/* TODO: Your rules here. */
+/* Your rules here. */
 
 /* Example:
 program: declaration-list {$$ = node( "program", 1, $1); gt->root = $$;}

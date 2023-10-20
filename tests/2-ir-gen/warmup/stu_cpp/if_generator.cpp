@@ -26,8 +26,8 @@ int main() {
     builder->set_insert_point(bb);
     auto aAlloca = builder->create_alloca(FloatType);
     builder->create_store(CONST_FP(5.555), aAlloca); 
-    auto trueBB = BasicBlock::create(module, "trueBB", mainFun);
-    auto falseBB = BasicBlock::create(module, "falseBB", mainFun);
+    auto trueBB = BasicBlock::create(module, "", mainFun);
+    auto falseBB = BasicBlock::create(module, "", mainFun);
     auto cmp = builder->create_fcmp_gt(builder->create_load(aAlloca), CONST_FP(1));
     builder->create_cond_br(cmp, trueBB, falseBB);
     builder->set_insert_point(trueBB);
