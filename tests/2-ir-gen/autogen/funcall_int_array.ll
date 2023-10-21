@@ -11,15 +11,18 @@ declare void @neg_idx_except()
 
 define void @test(i32* %arg0) {
 label_entry:
-  %op1 = icmp slt i32 3, 0
-  br i1 %op1, label %label2, label %label3
-label2:                                                ; preds = %label_entry
+  %op1 = alloca i32*
+  store i32* %arg0, i32** %op1
+  %op2 = icmp slt i32 3, 0
+  br i1 %op2, label %label3, label %label4
+label3:                                                ; preds = %label_entry
   call void @neg_idx_except()
-  br label %label3
-label3:                                                ; preds = %label_entry, %label2
-  %op4 = getelementptr i32, i32* %arg0, i32 0, i32 3
-  %op5 = load i32, i32* %op4
-  call void @output(i32 %op5)
+  br label %label4
+label4:                                                ; preds = %label_entry, %label3
+  %op5 = load i32*, i32** %op1
+  %op6 = getelementptr i32, i32* %op5, i32 3
+  %op7 = load i32, i32* %op6
+  call void @output(i32 %op7)
   ret void
 }
 define void @main() {

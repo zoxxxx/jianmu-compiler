@@ -80,8 +80,7 @@ Value* CminusfBuilder::visit(ASTVarDeclaration &node) {
             scope.push(node.id, GlobalVariable::create(node.id, module.get(), array_type, false, initializer));
         }
         else{
-            auto ptr = builder->create_alloca(array_type);
-            scope.push(node.id, ptr);
+            scope.push(node.id, builder->create_alloca(array_type));
         }
     }
    
@@ -131,11 +130,9 @@ Value* CminusfBuilder::visit(ASTFunDeclaration &node) {
             auto ptr = builder->create_alloca(param_types[i]);
             builder->create_store(args[i], ptr);
             scope.push(node.params[i]->id, ptr);
-            // LOG(DEBUG)<<scope.find("a")->get_type()->get_pointer_element_type()->print();
     }
     node.compound_stmt->accept(*this);
-    if (not builder->get_insert_block()->is_terminated())
-    {
+    if (not builder->get_insert_block()->is_terminated()) {
         if (context.func->get_return_type()->is_void_type())
             builder->create_void_ret();
         else if (context.func->get_return_type()->is_float_type())
@@ -148,8 +145,8 @@ Value* CminusfBuilder::visit(ASTFunDeclaration &node) {
 }
 
 Value* CminusfBuilder::visit(ASTParam &node) {
-    // TODO: This function is empty now.
-    // Add some code here.
+    // This function is empty now.
+    // don't know what to do here
     return nullptr;
 }
 
@@ -191,11 +188,13 @@ Value* CminusfBuilder::visit(ASTSelectionStmt &node) {
 
         builder->set_insert_point(trueBB);
         node.if_statement->accept(*this);
-        builder->create_br(mergeBB);
+        if(not builder->get_insert_block()->is_terminated())
+            builder->create_br(mergeBB);
 
         builder->set_insert_point(falseBB);
         node.else_statement->accept(*this);
-        builder->create_br(mergeBB);
+        if(not builder->get_insert_block()->is_terminated())
+            builder->create_br(mergeBB);
 
         builder->set_insert_point(mergeBB);
     }
@@ -207,7 +206,9 @@ Value* CminusfBuilder::visit(ASTSelectionStmt &node) {
 
         builder->set_insert_point(trueBB);
         node.if_statement->accept(*this);
-        builder->create_br(mergeBB);
+
+        if(not builder->get_insert_block()->is_terminated())
+            builder->create_br(mergeBB);
 
         builder->set_insert_point(mergeBB);
     }
@@ -231,7 +232,8 @@ Value* CminusfBuilder::visit(ASTIterationStmt &node) {
 
     builder->set_insert_point(bodyBB);
     node.statement->accept(*this);
-    builder->create_br(condBB);
+    if(not builder->get_insert_block()->is_terminated())
+        builder->create_br(condBB);
 
     builder->set_insert_point(mergeBB);
     return nullptr;
@@ -244,25 +246,38 @@ Value* CminusfBuilder::visit(ASTReturnStmt &node) {
     } else {
         // You need to solve other return cases (e.g. return an integer).
         auto expression_ret = node.expression->accept(*this);
+        if(context.func->get_return_type()->is_float_type()){
+            if(not expression_ret->get_type()->is_float_type())
+                expression_ret = builder->create_sitofp(expression_ret, FLOAT_T);
+        }
+        else if(context.func->get_return_type()->is_integer_type()){
+            if(expression_ret->get_type()->is_float_type())
+                expression_ret = builder->create_fptosi(expression_ret, INT32_T);
+            else if(expression_ret->get_type()->is_int1_type())
+                expression_ret = builder->create_zext(expression_ret, INT32_T);
+        }
         builder->create_ret(expression_ret);
     }
     return nullptr;
 }
 
 Value* CminusfBuilder::visit(ASTVar &node) {
+    auto isLValue = context.isLValue;
+    context.isLValue = false;
     if(node.expression == nullptr){
         auto ptr = scope.find(node.id);
-        // LOG(DEBUG)<<ptr->get_type()->is_array_type();
-        // LOG(DEBUG)<<ptr->get_type()->get_pointer_element_type()->is_array_type();
-        if(context.isLValue)return ptr;
+        if(isLValue)return ptr;
         else if(ptr->get_type()->get_pointer_element_type()->is_array_type())
+            // if var is pointer to array, then we need to get the pointer to the first element of the array
+            // as this will only happen when we are trying to pass an array as a parameter
             return builder->create_gep(ptr, {CONST_INT(0),CONST_INT(0)});
         else return builder->create_load(ptr);
     }
     else{
         auto expression_ret = node.expression->accept(*this);
-        if(not expression_ret->get_type()->is_integer_type())
+        if(not expression_ret->get_type()->is_integer_type()){
             expression_ret = builder->create_fptosi(expression_ret, INT32_T);
+        }
 
         auto exceptBB = BasicBlock::create(module.get(), "", context.func);
         auto mergeBB = BasicBlock::create(module.get(), "", context.func);
@@ -272,16 +287,23 @@ Value* CminusfBuilder::visit(ASTVar &node) {
 
         builder->set_insert_point(exceptBB);
         builder->create_call(scope.find("neg_idx_except"), {});
-        builder->create_br(mergeBB);
+        if(not builder->get_insert_block()->is_terminated())
+            builder->create_br(mergeBB);
 
         builder->set_insert_point(mergeBB);
         auto var = scope.find(node.id);
         GetElementPtrInst *ptr;
+
         if(var->get_type()->get_pointer_element_type()->is_array_type())
+            // if var is pointer to array, then we need to get the pointer to the first element of the array
             ptr = builder->create_gep(var, {CONST_INT(0), expression_ret});
-        else 
-            ptr = builder->create_gep(var, {expression_ret});
-        if(context.isLValue)return ptr;
+        else {
+            // if var is a pointer to pointer(which is the start of an array)
+            // then we need to get the pointer to the first element of the array
+            auto ptr_res = builder->create_load(var);
+            ptr = builder->create_gep(ptr_res, {expression_ret});
+        }
+        if(isLValue)return ptr;
         else return builder->create_load(ptr);
     }
     return nullptr;
@@ -290,7 +312,6 @@ Value* CminusfBuilder::visit(ASTVar &node) {
 Value* CminusfBuilder::visit(ASTAssignExpression &node) {
     context.isLValue = true;
     auto var = node.var->accept(*this);
-    context.isLValue = false;
     auto var_type = var->get_type()->get_pointer_element_type();
     auto expression_ret = node.expression->accept(*this);
     if(var_type->is_float_type()){
@@ -438,17 +459,13 @@ Value* CminusfBuilder::visit(ASTTerm &node) {
 }
 
 Value* CminusfBuilder::visit(ASTCall &node) {
-    LOG(DEBUG)<<node.id;
     std::vector<Value *> args;
     for (auto &arg : node.args) {
         args.push_back(arg->accept(*this));
-        // LOG(DEBUG)<<args.back()->get_type()->get_pointer_element_type()->print();
     }
     auto func = scope.find(node.id);
     auto func_type = static_cast<FunctionType *>(func->get_type());
     if(func_type->get_num_of_args() != args.size()){
-        LOG(DEBUG) << func_type->get_num_of_args();
-        LOG(DEBUG) << args.size();
         LOG(ERROR) << "The number of arguments is not equal to the number of parameters.";
     }
     for (unsigned int i = 0 ; i < args.size(); i++){

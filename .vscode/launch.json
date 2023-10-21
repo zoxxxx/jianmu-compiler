@@ -9,7 +9,7 @@
             "request": "launch",
             "name": "Debug",
             "program": "${workspaceFolder}/build/cminusfc",
-            "args": ["testcases/lv2/funcall_array_array.cminus", "-emit-llvm"],
+            "args": ["testcases/lv3/complex1.cminus", "-emit-llvm"],
             "cwd": "${workspaceFolder}/tests/2-ir-gen/autogen/",
             "env": {
                 "LOGV": "0"
