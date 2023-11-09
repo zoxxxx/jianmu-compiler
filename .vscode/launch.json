@@ -14,6 +14,24 @@
             "env": {
                 "LOGV": "0"
             }
+        },
+        {
+            "type": "cppdbg",
+            "request": "launch",
+            "name": "assembly",
+            "program": "${workspaceFolder}/build/float",
+            "args": [],
+            "cwd": "${workspaceFolder}/build/",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/opt/gdb/bin/loongarch64-unknown-linux-gnu-gdb",
+            "miDebuggerServerAddress": "localhost:1234",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
         }
     ]
 }

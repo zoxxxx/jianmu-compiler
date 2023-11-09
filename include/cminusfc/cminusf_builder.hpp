@@ -108,7 +108,7 @@ class CminusfBuilder : public ASTVisitor {
     struct {
         // function that is being built
         Function *func = nullptr;
-        // TODO: you should add more fields to store state
+        //  you should add more fields to store state
         bool isLValue = false;
     } context;
 };
