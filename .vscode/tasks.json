@@ -4,7 +4,7 @@
             "label": "qemu-static",
             "type": "shell",
             "isBackground": true,
-            "command": "/opt/qemu/bin/qemu-loongarch64 -g 1234 ~/compiler/2023ustc-jianmu-compiler/build/float",
+            "command": "/opt/qemu/bin/qemu-loongarch64 -g 1234 /home/zox/compiler/2023ustc-jianmu-compiler/tests/3-codegen/autogen/output/stu_test",
             "problemMatcher": [
                 {
                 "pattern": [

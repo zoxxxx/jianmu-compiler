@@ -8,20 +8,17 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
-            "program": "${workspaceFolder}/build/cminusfc",
-            "args": ["testcases/lv3/complex1.cminus", "-emit-llvm"],
-            "cwd": "${workspaceFolder}/tests/2-ir-gen/autogen/",
-            "env": {
-                "LOGV": "0"
-            }
+            "program": "cminusfc",
+            "args": ["/home/zox/compiler/2023ustc-jianmu-compiler/tests/3-codegen/autogen/testcases/6-array.cminus", "-S"],
+            "cwd": "${workspaceFolder}/build",
         },
         {
             "type": "cppdbg",
             "request": "launch",
             "name": "assembly",
-            "program": "${workspaceFolder}/build/float",
+            "program": "~/compiler/2023ustc-jianmu-compiler/tests/3-codegen/autogen/output/stu_test",
             "args": [],
-            "cwd": "${workspaceFolder}/build/",
+            "cwd": "/home/zox/compiler/2023ustc-jianmu-compiler/tests/3-codegen/autogen/output/",
             "MIMode": "gdb",
             "miDebuggerPath": "/opt/gdb/bin/loongarch64-unknown-linux-gnu-gdb",
             "miDebuggerServerAddress": "localhost:1234",
