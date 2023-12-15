@@ -13,7 +13,6 @@ class Mem2Reg : public Pass {
     Function *func_;
     std::unique_ptr<Dominators> dominators_;
     std::map<Value *, std::stack<Value *>> var_stack_;
-    std::set<Instruction *> globals_names_;
     std::map<PhiInst *, Value *>phi_map_;
     // TODO 添加需要的变量
 

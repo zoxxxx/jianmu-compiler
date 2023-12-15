@@ -27,8 +27,8 @@ void Dominators::dfs(BasicBlock *bb, std::set<BasicBlock *> &visited) {
             dfs(succ, visited);
         }
     }
-    reverse_post_order_vec_.push_back(bb);
-    reverse_post_order_.insert({bb, reverse_post_order_.size()});
+    post_order_vec_.push_back(bb);
+    post_order_.insert({bb, post_order_.size()});
 }
 
 void Dominators::create_reverse_post_order(Function *f) {
@@ -39,10 +39,10 @@ void Dominators::create_reverse_post_order(Function *f) {
 
 BasicBlock *Dominators::intersect(BasicBlock *bb1, BasicBlock *bb2) {
     while (bb1 != bb2) {
-        while (get_reverse_post_order(bb1) < get_reverse_post_order(bb2)) {
+        while (get_post_order(bb1) < get_post_order(bb2)) {
             bb1 = get_idom(bb1);
         }
-        while (get_reverse_post_order(bb2) < get_reverse_post_order(bb1)) {
+        while (get_post_order(bb2) < get_post_order(bb1)) {
             bb2 = get_idom(bb2);
         }
     }
@@ -55,11 +55,14 @@ void Dominators::create_idom(Function *f) {
     bool changed;
     do {
         changed = false;
-        for (auto &bb : reverse_post_order_vec_) {
+        for(auto it = post_order_vec_.rbegin(); it != post_order_vec_.rend(); it++){
+            auto bb = *it;
             if (bb == f->get_entry_block())
                 continue;
-            BasicBlock *new_idom = nullptr;
+            if(bb->get_pre_basic_blocks().empty())
+                continue;
             BasicBlock *first_pred = bb->get_pre_basic_blocks().front();
+            BasicBlock *new_idom = first_pred;
             for (auto &pred : bb->get_pre_basic_blocks()) {
                 if(pred == first_pred)
                     continue;
@@ -96,7 +99,7 @@ void Dominators::create_dom_tree_succ(Function *f) {
     // 分析得到 f 中各个基本块的支配树后继
     for (auto &bb1 : f->get_basic_blocks()){
         auto bb = &bb1;
-        if(get_idom(bb) != nullptr){
+        if(get_idom(bb) != nullptr && get_idom(bb) != bb){
             dom_tree_succ_blocks_[get_idom(bb)].insert(bb);
         }
     }

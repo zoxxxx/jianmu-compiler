@@ -14,8 +14,8 @@ class Dominators : public Pass {
     ~Dominators() = default;
     void run() override;
 
-    unsigned int get_reverse_post_order(BasicBlock *bb) {
-        return reverse_post_order_.at(bb);
+    unsigned int get_post_order(BasicBlock *bb) {
+        return post_order_.at(bb);
     }
     BasicBlock *get_idom(BasicBlock *bb) { return idom_.at(bb); }
     const BBSet &get_dominance_frontier(BasicBlock *bb) {
@@ -34,8 +34,8 @@ class Dominators : public Pass {
     BasicBlock *intersect(BasicBlock *bb1, BasicBlock *bb2);
     // TODO 补充需要的函数
 
-    std::vector<BasicBlock *> reverse_post_order_vec_{}; // 逆后序
-    std::map<BasicBlock *, unsigned int> reverse_post_order_{}; // 逆后序
+    std::vector<BasicBlock *> post_order_vec_{}; // 逆后序
+    std::map<BasicBlock *, unsigned int> post_order_{}; // 逆后序
     std::map<BasicBlock *, BasicBlock *> idom_{};  // 直接支配
     std::map<BasicBlock *, BBSet> dom_frontier_{}; // 支配边界集合
     std::map<BasicBlock *, BBSet> dom_tree_succ_blocks_{}; // 支配树中的后继节点
