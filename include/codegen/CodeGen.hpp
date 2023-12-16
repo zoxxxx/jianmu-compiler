@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ASMInstruction.hpp"
+#include "BasicBlock.hpp"
 #include "Module.hpp"
 #include "Register.hpp"
 #include<unordered_map>
@@ -62,6 +63,8 @@ class CodeGen {
     void gen_sitofp();
     void gen_fptosi();
     void gen_epilogue();
+    
+    void gen_copy_statement(BasicBlock *bb);
 
     static std::string label_name(BasicBlock *bb) {
         return "." + bb->get_parent()->get_name() + "_" + bb->get_name();

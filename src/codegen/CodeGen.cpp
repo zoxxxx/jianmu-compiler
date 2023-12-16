@@ -1,5 +1,6 @@
 #include "CodeGen.hpp"
 
+#include "BasicBlock.hpp"
 #include "CodeGenUtil.hpp"
 #include "Instruction.hpp"
 #include "Register.hpp"
@@ -493,6 +494,32 @@ void CodeGen::gen_fptosi() {
     store_from_greg(context.inst, Reg::t(0));
 }
 
+void CodeGen::gen_copy_statement(BasicBlock *bb) {
+    for (auto &bb_succ : bb->get_succ_basic_blocks()) {
+        for (auto &inst1 : bb_succ->get_instructions()){
+            auto inst = &inst1;
+            if(inst->is_phi()){
+                auto *PhiInst = static_cast<class PhiInst *>(inst);
+                for (unsigned int i = 0; i < PhiInst->get_num_operand(); i += 2){
+                    auto *op = PhiInst->get_operand(i);
+                    auto *bb_prev = static_cast<BasicBlock *>(PhiInst->get_operand(i + 1));
+                    if(bb_prev == bb){
+                        auto *op_type = op->get_type();
+                        if(op_type->is_integer_type() || op_type->is_pointer_type()){
+                            load_to_greg(op, Reg::t(0));
+                            store_from_greg(inst, Reg::t(0));
+                        }
+                        else if(op_type->is_float_type()){
+                            load_to_freg(op, FReg::ft(0));
+                            store_from_freg(inst, FReg::ft(0));
+                        }
+                    }
+                }
+            }
+
+        }
+    }
+}
 void CodeGen::run() {
     // 确保每个函数中基本块的名字都被设置好
     // 想一想：为什么？
@@ -558,6 +585,7 @@ void CodeGen::run() {
                         gen_ret();
                         break;
                     case Instruction::br:
+                        gen_copy_statement(&bb);
                         gen_br();
                         break;
                     case Instruction::add:
@@ -598,7 +626,7 @@ void CodeGen::run() {
                         gen_fcmp();
                         break;
                     case Instruction::phi:
-                        throw not_implemented_error{"need to handle phi!"};
+                        // phi has been deal in the previous basic block
                         break;
                     case Instruction::call:
                         gen_call();

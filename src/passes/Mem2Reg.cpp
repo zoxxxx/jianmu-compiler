@@ -100,7 +100,11 @@ void Mem2Reg::rename(BasicBlock *bb) {
             auto load = dynamic_cast<LoadInst *>(inst);
             auto lval = load->get_lval();
             if(!is_valid_ptr(lval))continue;
-            auto new_lval = var_stack_[load->get_lval()].top();
+            if(var_stack_.find(lval) == var_stack_.end())
+                continue;
+            if(var_stack_[lval].empty())
+                continue;
+            auto new_lval = var_stack_[lval].top();
             load->replace_all_use_with(new_lval);
         }
 
