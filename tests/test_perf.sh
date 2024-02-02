@@ -1,7 +1,7 @@
 #!/bin/bash
 
 project_dir=$(realpath ../)
-io_dir=$(realpath "$project_dir"/src/io)
+sylib_dir=$(realpath "$project_dir"/src/sylib)
 output_dir=output
 suffix=cminus
 
@@ -49,7 +49,7 @@ for case in $testcases; do
     check_return_value $? 0 "CE" "cminusfc compiler error" || continue
     # gcc compile asm to executable
     loongarch64-unknown-linux-gnu-gcc -static \
-        "$asm_mem2reg_off" "$io_dir"/io.c -o "$exe_mem2reg_off" \
+        "$asm_mem2reg_off" "$sylib_dir"/sylib.c -o "$exe_mem2reg_off" \
         >>$LOG
     check_return_value $? 0 "CE" "gcc compiler error" || continue
 
@@ -59,7 +59,7 @@ for case in $testcases; do
     check_return_value $? 0 "CE" "cminusfc compiler error" || continue
     # gcc compile asm to executable
     loongarch64-unknown-linux-gnu-gcc -static \
-        "$asm_mem2reg_on" "$io_dir"/io.c -o "$exe_mem2reg_on" \
+        "$asm_mem2reg_on" "$sylib_dir"/sylib.c -o "$exe_mem2reg_on" \
         >>$LOG
     check_return_value $? 0 "CE" "gcc compiler error" || continue
 

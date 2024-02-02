@@ -1,7 +1,7 @@
 #!/bin/bash
 
 project_dir=$(realpath ../)
-io_dir=$(realpath "$project_dir"/src/io)
+sylib_dir=$(realpath "$project_dir"/src/sylib)
 output_dir=output
 suffix=sy
 
@@ -83,7 +83,7 @@ for case in $testcases; do
 
 	# gcc compile asm to executable
 	loongarch64-unknown-linux-gnu-gcc -static \
-		"$asm_file" "$io_dir"/io.c -o "$exe_file" \
+		"$asm_file" "$sylib_dir"/sylib.c -o "$exe_file" \
 		>>$LOG
 	check_return_value $? 0 "CE" "gcc compiler error" || continue
 
