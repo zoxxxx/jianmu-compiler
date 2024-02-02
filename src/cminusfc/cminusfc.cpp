@@ -107,7 +107,7 @@ void Config::check() {
     if (input_file.empty()) {
         print_err("no input file");
     }
-    if (input_file.extension() != ".cminus") {
+    if (input_file.extension() != ".sy") {
         print_err("file format not recognized");
     }
     if (emitllvm and emitasm) {

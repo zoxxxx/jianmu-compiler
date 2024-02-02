@@ -6,3 +6,4 @@ tests/functional
 tests/performance
 tests/hidden_functional
 tests/final_performance
+tests/output
