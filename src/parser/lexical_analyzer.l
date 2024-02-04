@@ -19,9 +19,18 @@ void pass_node(char *text){
 
 %}
 
-letter   [a-zA-Z]
-digit    [0-9]
+nondigit       [a-zA-Z_]
+digit          [0-9]
+nonzerodigit   [1-9]
+octaldigit     [0-7]
+hexdigit       [0-9a-fA-F]
 
+sign           [+-]
+exponent       ([eE]{sign}?{digit}+)
+fraction       ({digit}*\.{digit}+|{digit}+\.)
+
+bin_exponent   ([pP]{sign}?{digit}+)
+hex_fraction   ({hexdigit}*\.{hexdigit}+|{hexdigit}+\.)
 
 %x comment
 %%
@@ -54,13 +63,22 @@ return    {pos_start = pos_end; pos_end += 6; pass_node(yytext); return RETURN;}
 void      {pos_start = pos_end; pos_end += 4; pass_node(yytext); return VOID;}
 while     {pos_start = pos_end; pos_end += 5; pass_node(yytext); return WHILE;}
 float     {pos_start = pos_end; pos_end += 5; pass_node(yytext); return FLOAT;}
+const     {pos_start = pos_end; pos_end += 5; pass_node(yytext); return CONST;}
 
-{digit}+  {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return INTEGER;}
-{letter}+ {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return ID;}
-({digit}+\.|{digit}*\.{digit}+) {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return FLOATPOINT;}
+{nonzerodigit}{digit}*   {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return INTCONST;}
+0{octaldigit}*           {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return INTCONST;}
+0[xX]{hexdigit}+         {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return INTCONST;}
+
+{fraction}{exponent}?    {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return FLOATCONST;}
+{digit}+{exponent}       {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return FLOATCONST;}
+0[xX]{hex_fraction}{bin_exponent}? {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return FLOATCONST;}
+0[xX]{hexdigit}+{bin_exponent}    {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return FLOATCONST;}
+
+{nondigit}({nondigit}|{digit})* {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return IDENT;}
 
 " "|\t    { pos_start = pos_end; pos_end++; }
 \n|\r|\n\r { pos_start = pos_end = 1; lines++; }
+\/\/      {pos_start = pos_end = 1; lines ++; }
 
  /*using start condition to deal with the comments*/
 \/\*                     { BEGIN(comment); }

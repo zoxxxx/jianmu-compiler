@@ -58,9 +58,9 @@ syntax_tree_node *node(const char *node_name, int children_num, ...);
 %token <node> LBRACE RBRACE
 %token <node> SEMI
 
-%token <node> ELSE IF INT RETURN VOID WHILE FLOAT
+%token <node> ELSE IF INT RETURN VOID WHILE FLOAT CONST
 
-%token <node> ID INTEGER FLOATPOINT
+%token <node> IDENT INTCONST FLOATCONST
 
 %type <node> program
 %type <node> type-specifier relop addop mulop
@@ -70,8 +70,8 @@ syntax_tree_node *node(const char *node_name, int children_num, ...);
 %type <node> params param-list param args arg-list
 
 %start program
-
 %%
+
 /* Your rules here. */
 
 /* Example:
@@ -94,8 +94,8 @@ var-declaration {$$ = node("declaration", 1, $1);}
 ;
 
 var-declaration :
-type-specifier ID SEMI {$$ = node("var-declaration", 3, $1, $2, $3);}
-|type-specifier ID LBRACK INTEGER RBRACK SEMI {$$ = node("var-declaration", 6, $1, $2, $3, $4, $5, $6);}
+type-specifier IDENT SEMI {$$ = node("var-declaration", 3, $1, $2, $3);}
+|type-specifier IDENT LBRACK INTCONST RBRACK SEMI {$$ = node("var-declaration", 6, $1, $2, $3, $4, $5, $6);}
 ;
 
 type-specifier :
@@ -105,7 +105,7 @@ INT {$$ = node("type-specifier", 1, $1);}
 ;
 
 fun-declaration :
-type-specifier ID LP params RP compound-stmt {$$ = node("fun-declaration", 6, $1, $2, $3, $4, $5, $6);}
+type-specifier IDENT LP params RP compound-stmt {$$ = node("fun-declaration", 6, $1, $2, $3, $4, $5, $6);}
 ;
 
 params :
@@ -114,8 +114,8 @@ param-list {$$ = node("params", 1, $1);}
 ;
 
 param :
-type-specifier ID {$$ = node("param", 2, $1, $2);}
-| type-specifier ID LBRACK RBRACK {$$ = node("param", 4, $1, $2, $3, $4);}
+type-specifier IDENT {$$ = node("param", 2, $1, $2);}
+| type-specifier IDENT LBRACK RBRACK {$$ = node("param", 4, $1, $2, $3, $4);}
 ;
 
 param-list :
@@ -168,8 +168,8 @@ var ASSIGN expression {$$ = node("expression", 3, $1, $2, $3);}
 ;
 
 var :
-ID {$$ = node("var", 1, $1);}
-| ID LBRACK expression RBRACK {$$ = node("var", 4, $1, $2, $3, $4);}
+IDENT {$$ = node("var", 1, $1);}
+| IDENT LBRACK expression RBRACK {$$ = node("var", 4, $1, $2, $3, $4);}
 ;
 
 simple-expression :
@@ -214,15 +214,15 @@ LP expression RP {$$ = node("factor", 3, $1, $2, $3);}
 ;
 
 integer :
-INTEGER {$$ = node("integer", 1, $1);}
+INTCONST {$$ = node("integer", 1, $1);}
 ;
 
 float :
-FLOATPOINT {$$ = node("float", 1, $1);}
+FLOATCONST {$$ = node("float", 1, $1);}
 ;
 
 call :
-ID LP args RP {$$ = node("call", 4, $1, $2, $3, $4);}
+IDENT LP args RP {$$ = node("call", 4, $1, $2, $3, $4);}
 ;
 
 args :
