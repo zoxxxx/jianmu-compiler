@@ -76,9 +76,9 @@ const     {pos_start = pos_end; pos_end += 5; pass_node(yytext); return CONST;}
 
 {nondigit}({nondigit}|{digit})* {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return IDENT;}
 
-" "|\t    { pos_start = pos_end; pos_end++; }
-\n|\r|\n\r { pos_start = pos_end = 1; lines++; }
-\/\/      {pos_start = pos_end = 1; lines ++; }
+" "|\t              { pos_start = pos_end; pos_end++; }
+\n|\r|\n\r          { pos_start = pos_end = 1; lines++; }
+\/\/.*(\n|\r|\n\r)? {pos_start = pos_end = 1; lines ++; }
 
  /*using start condition to deal with the comments*/
 \/\*                     { BEGIN(comment); }
