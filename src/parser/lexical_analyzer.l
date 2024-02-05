@@ -34,12 +34,15 @@ hex_fraction   ({hexdigit}*\.{hexdigit}+|{hexdigit}+\.)
 
 %x comment
 %%
- /* to do for students */
- /* two cases for you, pass_node will send flex's token to bison */
+
 \+ 	{pos_start = pos_end; pos_end ++; pass_node(yytext); return ADD;}
 -    {pos_start = pos_end; pos_end ++; pass_node(yytext); return SUB;}
 \*   {pos_start = pos_end; pos_end ++; pass_node(yytext); return MUL;}
 \/   {pos_start = pos_end; pos_end ++; pass_node(yytext); return DIV;}
+\%   {pos_start = pos_end; pos_end ++; pass_node(yytext); return MOD;} 
+&&   {pos_start = pos_end; pos_end += 2; pass_node(yytext); return AND;}
+\|\| {pos_start = pos_end; pos_end += 2; pass_node(yytext); return OR;}
+!    {pos_start = pos_end; pos_end ++; pass_node(yytext); return NOT;}
 \(   {pos_start = pos_end; pos_end ++; pass_node(yytext); return LP;}
 \)   {pos_start = pos_end; pos_end ++; pass_node(yytext); return RP;}
 \<=  {pos_start = pos_end; pos_end += 2; pass_node(yytext); return LE;}
@@ -64,6 +67,8 @@ void      {pos_start = pos_end; pos_end += 4; pass_node(yytext); return VOID;}
 while     {pos_start = pos_end; pos_end += 5; pass_node(yytext); return WHILE;}
 float     {pos_start = pos_end; pos_end += 5; pass_node(yytext); return FLOAT;}
 const     {pos_start = pos_end; pos_end += 5; pass_node(yytext); return CONST;}
+break     {pos_start = pos_end; pos_end += 5; pass_node(yytext); return BREAK;}
+continue  {pos_start = pos_end; pos_end += 8; pass_node(yytext); return CONTINUE;}
 
 {nonzerodigit}{digit}*   {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return INTCONST;}
 0{octaldigit}*           {pos_start = pos_end; pos_end += strlen(yytext); pass_node(yytext); return INTCONST;}
@@ -89,5 +94,4 @@ const     {pos_start = pos_end; pos_end += 5; pass_node(yytext); return CONST;}
 
 . { pos_start = pos_end; pos_end++; return ERROR; }
 
- /****请在此补全所有flex的模式与动作  end******/
 %%
