@@ -11,6 +11,13 @@
 #include <map>
 #include <memory>
 
+struct inherite{
+    int DownType;
+    int is_empty;
+    Value* Data;
+    
+};
+
 class Scope {
   public:
     // enter a new scope
@@ -84,28 +91,65 @@ class CminusfBuilder : public ASTVisitor {
     std::unique_ptr<Module> getModule() { return std::move(module); }
 
   private:
-    virtual Value *visit(ASTProgram &) override final;
-    virtual Value *visit(ASTNum &) override final;
-    virtual Value *visit(ASTVarDeclaration &) override final;
-    virtual Value *visit(ASTFunDeclaration &) override final;
-    virtual Value *visit(ASTParam &) override final;
-    virtual Value *visit(ASTCompoundStmt &) override final;
-    virtual Value *visit(ASTExpressionStmt &) override final;
-    virtual Value *visit(ASTSelectionStmt &) override final;
-    virtual Value *visit(ASTIterationStmt &) override final;
-    virtual Value *visit(ASTReturnStmt &) override final;
-    virtual Value *visit(ASTAssignExpression &) override final;
-    virtual Value *visit(ASTSimpleExpression &) override final;
-    virtual Value *visit(ASTAdditiveExpression &) override final;
-    virtual Value *visit(ASTVar &) override final;
-    virtual Value *visit(ASTTerm &) override final;
-    virtual Value *visit(ASTCall &) override final;
+    virtual inherite visit(ASTProgram &) override final;
+    virtual inherite visit(ASTCompUnit &) override final;
+    virtual inherite visit(ASTDecl &) override final;
+    virtual inherite visit(ASTStmt &) override final;
+    virtual inherite visit(ASTFuncDef &) override final;
+    virtual inherite visit(ASTConstDecl &) override final;
+    virtual inherite visit(ASTVarDecl &) override final;
+    virtual inherite visit(ASTBtype &) override final;
+    virtual inherite visit(ASTConstDefList &) override final;
+    virtual inherite visit(ASTConstDef &) override final;
+    virtual inherite visit(ASTIdent &) override final;
+    virtual inherite visit(ASTConstExpList &) override final;
+    virtual inherite visit(ASTConstInitVal &) override final;
+    virtual inherite visit(ASTConstExp &) override final;
+    virtual inherite visit(ASTConstInitValList &) override final;
 
+    virtual inherite visit(ASTVarDefList &) override final;
+    virtual inherite visit(ASTVarDef &) override final;
+    virtual inherite visit(ASTExpList &) override final;
+    virtual inherite visit(ASTInitVal &) override final;
+    virtual inherite visit(ASTExp &) override final;
+    virtual inherite visit(ASTInitValList &) override final;
+
+    virtual inherite visit(ASTFuncType &) override final;
+    virtual inherite visit(ASTFuncFParams &) override final;
+    virtual inherite visit(ASTFuncRParams &) override final;
+    virtual inherite visit(ASTBlock &) override final;
+    virtual inherite visit(ASTFuncFParam &) override final;
+    virtual inherite visit(ASTBlockItemList &) override final;
+    virtual inherite visit(ASTBlockItem &) override final;
+
+    virtual inherite visit(ASTLVal &) override final;
+    virtual inherite visit(ASTCond &) override final;
+    
+    
+    virtual inherite visit(ASTAddExp &) override final;
+    virtual inherite visit(ASTLOrExp &) override final;
+
+    virtual inherite visit(ASTLOrExp &) override final;
+    virtual inherite visit(ASTPrimaryExp &) override final;
+    virtual inherite visit(ASTNumber &) override final;
+    virtual inherite visit(ASTIntConst &) override final;
+    virtual inherite visit(ASTFloatConst &) override final;
+    virtual inherite visit(ASTUnaryExp &) override final;
+    virtual inherite visit(ASTUnaryOp &) override final;
+
+    virtual inherite visit(ASTMulExp &) override final;
+    virtual inherite visit(ASTRelExp &) override final;
+    virtual inherite visit(ASTEqExp &) override final;
+    virtual inherite visit(ASTLAndExp &) override final;
+    
     std::unique_ptr<IRBuilder> builder;
     Scope scope;
     std::unique_ptr<Module> module;
 
     struct {
+        int vartype = 0; //when translating, use vartype to record i or f
+
+        
         // function that is being built
         Function *func = nullptr;
         //  you should add more fields to store state

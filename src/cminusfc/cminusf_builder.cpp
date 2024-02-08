@@ -13,9 +13,8 @@
 
 // types
 Type *VOID_T;
-Type *INT1_T;
-Type *INT32_T;
-Type *INT32PTR_T;
+Type *INT_T;
+Type *INTPTR_T;
 Type *FLOAT_T;
 Type *FLOATPTR_T;
 
@@ -27,20 +26,204 @@ Type *FLOATPTR_T;
  * scope.find: find and return the value bound to the name
  */
 
-Value* CminusfBuilder::visit(ASTProgram &node) {
+inherite CminusfBuilder::visit(ASTProgram &node) {
     VOID_T = module->get_void_type();
-    INT1_T = module->get_int1_type();
-    INT32_T = module->get_int32_type();
-    INT32PTR_T = module->get_int32_ptr_type();
+    INT_T = module->get_int32_type();
+    INTPTR_T = module->get_int32_ptr_type();
     FLOAT_T = module->get_float_type();
     FLOATPTR_T = module->get_float_ptr_type();
 
-    Value *ret_val = nullptr;
-    for (auto &decl : node.declarations) {
-        ret_val = decl->accept(*this);
-    }
-    return ret_val;
+    (node.Vec[0])->accept(*this);
 }
+
+inherite CminusfBuilder::visit(ASTCompUnit &node){
+    if(node.Type == 1 || node.Type == 2){
+        (node.Vec[0])->accept(*this);
+        (node.Vec[1])->accept(*this);
+    }else{
+        (node.Vec[0])->accept(*this);
+    }
+}
+inherite CminusfBuilder::visit(ASTDecl &node){
+    (node.Vec[0])->accept(*this);
+}
+inherite CminusfBuilder::visit(ASTStmt &node){
+    
+}
+inherite CminusfBuilder::visit(ASTFuncDef &node) ;
+inherite CminusfBuilder::visit(ASTConstDecl &node){
+    inherite leaftype = (node.Vec[0])->accept(*this);
+    context.vartype = leaftype.DownType; //把综合属性的类型当成继承属性传给列表
+    (node.Vec[1])->accept(*this);
+}
+inherite CminusfBuilder::visit(ASTVarDecl &) ;
+inherite CminusfBuilder::visit(ASTBtype &node){
+    inherite nodeS;
+    nodeS.DownType = node.type;
+    return nodeS;
+}
+inherite CminusfBuilder::visit(ASTConstDefList &node){
+    if(node.type == 1){
+        (node.Vec[0])->accept(*this);
+    }else{
+        (node.Vec[0])->accept(*this);
+        (node.Vec[1])->accept(*this);
+    }
+}
+inherite CminusfBuilder::visit(ASTConstDef &node){
+    Type *var_type = nullptr;
+    if (context.vartype == 1) // int
+        var_type = INT_T;
+    else if (context.vartype == 2) //float
+        var_type = FLOAT_T;
+    inherite ConstExpListS = (node.Vec[1])->accept(*this);
+    inherite ConstInitValS = (node.Vec[2])->accept(*this);
+    if(ConstExpListS.is_empty == 1){ //not array
+        if(scope.in_global()){
+            scope.push(node.id, GlobalVariable::create(node.id, module.get(), var_type, true, ConstInitValS.Data)); //global初始化会自带store
+        }else{
+            auto ptr = builder->create_alloca(var_type);
+            builder->create_store(ptr,ConstInitValS.Data);
+            scope.push(node.id, ptr);
+        }
+    }else{ // array
+        if(scope.in_global()){
+            
+        }else{
+            
+        }
+    }
+}
+inherite CminusfBuilder::visit(ASTIdent &) ;
+inherite CminusfBuilder::visit(ASTConstExpList &) ;
+inherite CminusfBuilder::visit(ASTConstInitVal &) ;
+inherite CminusfBuilder::visit(ASTConstExp &) ;
+inherite CminusfBuilder::visit(ASTConstInitValList &) ;
+
+inherite CminusfBuilder::visit(ASTVarDefList &) ;
+inherite CminusfBuilder::visit(ASTVarDef &) ;
+inherite CminusfBuilder::visit(ASTExpList &) ;
+inherite CminusfBuilder::visit(ASTInitVal &) ;
+inherite CminusfBuilder::visit(ASTExp &) ;
+inherite CminusfBuilder::visit(ASTInitValList &) ;
+
+inherite CminusfBuilder::visit(ASTFuncType &) ;
+inherite CminusfBuilder::visit(ASTFuncFParams &) ;
+inherite CminusfBuilder::visit(ASTBlock &) ;
+inherite CminusfBuilder::visit(ASTFuncFParam &) ;
+inherite CminusfBuilder::visit(ASTBlockItemList &) ;
+inherite CminusfBuilder::visit(ASTBlockItem &) ;
+
+inherite CminusfBuilder::visit(ASTLVal &) ;
+inherite CminusfBuilder::visit(ASTCond &) ;
+    
+    
+inherite CminusfBuilder::visit(ASTAddExp &) ;
+inherite CminusfBuilder::visit(ASTLOrExp &) ;
+
+inherite CminusfBuilder::visit(ASTLOrExp &) ;
+inherite CminusfBuilder::visit(ASTPrimaryExp &node){
+    return (node.Vec[0])->accept(*this);
+}
+inherite CminusfBuilder::visit(ASTNumber &node){
+    return (node.Vec[0])->accept(*this);
+}
+inherite CminusfBuilder::visit(ASTIntConst &node){
+    inherite now;
+    now.Data = CONST_INT(node.num);
+    context.RConstI = node.num;
+    return now;
+}
+inherite CminusfBuilder::visit(ASTFloatConst &node){
+    inherite now;
+    now.Data = CONST_FP(node.num);
+    context.RConstF = node.num;
+    return now;
+}
+inherite CminusfBuilder::visit(ASTUnaryExp &node){
+    if(node.Type == 3 || node.Type == 2){
+        std::vector<Value *> args;
+        for (auto &arg : node.args) {
+            args.push_back(arg->accept(*this));
+        }
+        auto func = scope.find(node.id);
+        auto func_type = static_cast<FunctionType *>(func->get_type());
+        for (unsigned int i = 0 ; i < args.size(); i++){
+            if(func_type->get_param_type(i)->is_float_type() and not args[i]->get_type()->is_float_type())
+                args[i] = builder->create_sitofp(args[i], FLOAT_T);
+            else if(func_type->get_param_type(i)->is_integer_type()){
+                if(args[i]->get_type()->is_float_type())
+                    args[i] = builder->create_fptosi(args[i], INT32_T);
+            }
+        }
+        return builder->create_call(func, args);
+    }else if(node.Type == 1)
+        return (node.Vec[0])->accept(*this);
+    else if(node.Type == 4){
+        if(node.UnaryOp == '+'){
+            return (node.Vec[0])->accept(*this);
+        }else if(node.UnaryOp == '-'){
+            auto qq = (node.Vec[0])->accept(*this);
+            if(qq.Data -> get_type() -> is_integer_type()){
+                qq.Data = builder->create_isub(0,qq.Data);
+                context.RConstI *= -1;
+            }else {
+                qq.Data = builder->create_fsub(0,qq.Data);
+                context.RConstF *= -1;
+            }
+            return qq;
+        }else if(node.UnaryOp == '!'){
+            auto qq = (node.Vec[0])->accept(*this);
+            if(qq.Data -> get_type() -> is_integer_type()){
+                qq.Data = builder->create_icmp_eq(0,qq.Data);
+                context.RConstI = !(context.RConstI);
+            }else {
+                qq.Data = builder->create_fcmp_eq(0,qq.Data);
+                context.RConstF *= -1;
+            }
+            return qq;
+        }
+    }
+}
+
+inherite CminusfBuilder::visit(ASTMulExp &node){
+    if(node.Type == 1){
+        return (node.Vec[0])->accept(*this);
+    }else {
+        auto p1 = (node.Vec[0])->accept(*this);
+        auto p2 = (node.Vec[1])->accept(*this);
+        if((p1.Data)->get_type()->is_float_type() or (p2.Data)->get_type()->is_float_type()){
+            if(not (p1.Data)->get_type()->is_float_type())
+                p1.Data = builder->create_sitofp(p1.Data, FLOAT_T);
+            if(not (p2.Data)->get_type()->is_float_type())
+                p2.Data = builder->create_sitofp(p2.Data, FLOAT_T);
+            if(node.op == '*'){
+                
+                p1.Data = builder->create_fmul(p1.Data, p2.Data);
+                context.RConstF = 
+            } else if(node.op == '/'){
+                return builder->create_fdiv(lhs, rhs);
+            }
+        }
+        else{
+            if(lhs->get_type()->is_int1_type())
+                lhs = builder->create_zext(lhs, INT32_T);
+            if(rhs->get_type()->is_int1_type())
+                rhs = builder->create_zext(rhs, INT32_T);
+            if(node.op == OP_MUL){
+                return builder->create_imul(lhs, rhs);
+            }
+            else if(node.op == OP_DIV){
+                return builder->create_isdiv(lhs, rhs);
+            }
+        }
+    }
+}
+inherite CminusfBuilder::visit(ASTRelExp &node){
+    
+}
+inherite CminusfBuilder::visit(ASTEqExp &node) ;
+inherite CminusfBuilder::visit(ASTLAndExp &node) ;
 
 Value* CminusfBuilder::visit(ASTNum &node) {
     if(node.type == TYPE_INT)
@@ -53,17 +236,7 @@ Value* CminusfBuilder::visit(ASTNum &node) {
 }
 
 Value* CminusfBuilder::visit(ASTVarDeclaration &node) {
-    Type *var_type = nullptr;
-    if (node.type == TYPE_INT)
-        var_type = INT32_T;
-    else if (node.type == TYPE_FLOAT)
-        var_type = FLOAT_T;
-    else if (node.type == TYPE_VOID)
-        LOG(ERROR) << "It makes no sense to declare a void variable.";
-    else 
-        LOG(ERROR) << "Unknown type.";
     if (node.num == nullptr) {
-        // code.num will be nullptr if the variable is not an array.
         if (scope.in_global()){
             auto initializer = ConstantZero::get(var_type, module.get());
             scope.push(node.id, GlobalVariable::create(node.id, module.get(), var_type, false, initializer));
