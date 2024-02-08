@@ -25,7 +25,7 @@ AST::AST(syntax_tree *s) {
 }
 
 ASTNode *AST::transform_node_iter(syntax_tree_node *n) {
-    if (_STR_EQ(n->name, "program")) {
+    if (_STR_EQ(n->name, "Program")) {
         auto node = new ASTProgram();
         // flatten declaration list
         std::stack<syntax_tree_node *> s;
@@ -38,11 +38,11 @@ ASTNode *AST::transform_node_iter(syntax_tree_node *n) {
 
         while (!s.empty()) {
             auto child_node =
-                static_cast<ASTDeclaration *>(transform_node_iter(s.top()));
+                static_cast<ASTNode *>(transform_node_iter(s.top()));
 
             auto child_node_shared =
-                std::shared_ptr<ASTDeclaration>(child_node);
-            node->declarations.push_back(child_node_shared);
+                std::shared_ptr<ASTNode>(child_node);
+            node->def_and_decls.push_back(child_node_shared);
             s.pop();
         }
         return node;
