@@ -21,11 +21,21 @@ enum UnaryOp {
     OP_NOT
 };
 
-enum RelOp {
-    // <=
-    OP_LE,
+enum BinaryOP {
+    // +
+    OP_PLUS,
+    // -
+    OP_MINUS,
+    // *
+    OP_MUL,
+    // /
+    OP_DIV,
+    // %
+    OP_MOD,
     // <
     OP_LT,
+    // <=
+    OP_LE,
     // >
     OP_GT,
     // >=
@@ -33,21 +43,11 @@ enum RelOp {
     // ==
     OP_EQ,
     // !=
-    OP_NEQ
-};
-
-enum AddOp {
-    // +
-    OP_PLUS,
-    // -
-    OP_MINUS
-};
-
-enum MulOp {
-    // *
-    OP_MUL,
-    // /
-    OP_DIV
+    OP_NEQ,
+    // &&
+    OP_AND,
+    // ||
+    OP_OR
 };
 
 class AST;
@@ -64,7 +64,7 @@ struct ASTInitVal;
 struct ASTExp;
 struct ASTBlock;
 struct ASTFuncDef;
-struct ASTParam;
+struct ASTFParam;
 struct ASTStmt;
 struct ASTLVal;
 struct ASTCond;
@@ -170,13 +170,13 @@ struct ASTFuncDef : ASTNode {
     virtual ~ASTFuncDef() = default;
     SysyType type;
     std::string id;
-    std::vector<std::shared_ptr<ASTParam>> params;
+    std::vector<std::shared_ptr<ASTFParam>> params;
     std::shared_ptr<ASTBlock> block;
 };
 
-struct ASTParam : ASTNode {
+struct ASTFParam : ASTNode {
     virtual Value *accept(ASTVisitor &) override final;
-    virtual ~ASTParam() = default;
+    virtual ~ASTFParam() = default;
     SysyType type;
     std::string id;
     bool is_array;
@@ -284,50 +284,117 @@ struct ASTNumber : ASTNode {
     std::variant<int, float> value;
 };
 
-struct UnaryExp : ASTNode {
+struct ASTExp : ASTNode {
+    virtual Value *accept(ASTVisitor &) override;
+    virtual ~ASTExp() = default;
+    virtual bool is_unary_exp() { return false; }
+    virtual bool is_binary_exp() { return false; }
+};
+
+struct ASTUnaryExp : ASTExp {
     virtual Value *accept(ASTVisitor &) override final;
-    virtual ~UnaryExp() = default;
+    virtual ~ASTUnaryExp() = default;
+    virtual bool is_unary_exp() override final { return true; }
+    UnaryOp op;
+    std::shared_ptr<ASTExp> exp;
+    std::shared_ptr<ASTLVal> l_val;
+    std::shared_ptr<ASTNumber> number;
+    std::string func_call_id;
+    std::vector<std::shared_ptr<ASTExp>> func_call_args;
+    bool has_unary_op;
+    bool is_l_val(){return l_val != nullptr;}
+    bool is_number(){return number != nullptr;}
+    bool is_func_call(){return func_call_id != "";}
+};
+
+struct ASTBinaryExp : ASTExp {
+    virtual Value *accept(ASTVisitor &) override final;
+    virtual ~ASTBinaryExp() = default;
+    virtual bool is_binary_exp() override final { return true; }
+    std::shared_ptr<ASTExp> lhs;
+    std::shared_ptr<ASTExp> rhs;
+    BinaryOP op;
+    bool is_add_exp() { return op == OP_PLUS || op == OP_MINUS; }
+    bool is_mul_exp() { return op == OP_MUL || op == OP_DIV || op == OP_MOD; }
+    bool is_rel_exp() { return op == OP_LT || op == OP_LE || op == OP_GT || op == OP_GE; }
+    bool is_eq_exp() { return op == OP_EQ || op == OP_NEQ; }
+    bool is_logic_and_exp() { return op == OP_AND; }
+    bool is_logic_or_exp() { return op == OP_OR; }
+    bool is_logic_exp() { return is_logic_and_exp() || is_logic_or_exp(); }
+};
+
+struct Cond : ASTNode {
+    virtual Value *accept(ASTVisitor &) override final;
+    virtual ~Cond() = default;
+    std::shared_ptr<ASTExp> exp;
+};
+
+struct ASTConstExp : ASTNode {
+    virtual Value *accept(ASTVisitor &) override final;
+    virtual ~ASTConstExp() = default;
+    SysyType type;
+    std::variant<int, float> value;
     std::shared_ptr<ASTExp> exp;
 };
 
 class ASTVisitor {
   public:
     virtual Value *visit(ASTProgram &) = 0;
-    virtual Value *visit(ASTNum &) = 0;
-    virtual Value *visit(ASTVarDeclaration &) = 0;
-    virtual Value *visit(ASTFunDeclaration &) = 0;
-    virtual Value *visit(ASTParam &) = 0;
-    virtual Value *visit(ASTCompoundStmt &) = 0;
-    virtual Value *visit(ASTExpressionStmt &) = 0;
+    virtual Value *visit(ASTConstDecl &) = 0;
+    virtual Value *visit(ASTConstDef &) = 0;
+    virtual Value *visit(ASTConstInitVal &) = 0;
+    virtual Value *visit(ASTVarDecl &) = 0;
+    virtual Value *visit(ASTVarDef &) = 0;
+    virtual Value *visit(ASTInitVal &) = 0;
+    virtual Value *visit(ASTFuncDef &) = 0;
+    virtual Value *visit(ASTFParam &) = 0;
+    virtual Value *visit(ASTBlock &) = 0;
+    virtual Value *visit(ASTStmt &) = 0;
+    virtual Value *visit(ASTExpStmt &) = 0;
+    virtual Value *visit(ASTAssignStmt &) = 0;
+    virtual Value *visit(ASTBlockStmt &) = 0;
     virtual Value *visit(ASTSelectionStmt &) = 0;
     virtual Value *visit(ASTIterationStmt &) = 0;
     virtual Value *visit(ASTReturnStmt &) = 0;
-    virtual Value *visit(ASTAssignExpression &) = 0;
-    virtual Value *visit(ASTSimpleExpression &) = 0;
-    virtual Value *visit(ASTAdditiveExpression &) = 0;
-    virtual Value *visit(ASTVar &) = 0;
-    virtual Value *visit(ASTTerm &) = 0;
-    virtual Value *visit(ASTCall &) = 0;
+    virtual Value *visit(ASTBreakStmt &) = 0;
+    virtual Value *visit(ASTContinueStmt &) = 0;
+    virtual Value *visit(ASTLVal &) = 0;
+    virtual Value *visit(ASTNumber &) = 0;
+    virtual Value *visit(ASTExp &) = 0;
+    virtual Value *visit(ASTUnaryExp &) = 0;
+    virtual Value *visit(ASTBinaryExp &) = 0;
+    virtual Value *visit(Cond &) = 0;
+    virtual Value *visit(ASTConstExp &) = 0;
 };
 
 class ASTPrinter : public ASTVisitor {
   public:
     virtual Value *visit(ASTProgram &) override final;
-    virtual Value *visit(ASTNum &) override final;
-    virtual Value *visit(ASTVarDeclaration &) override final;
-    virtual Value *visit(ASTFunDeclaration &) override final;
-    virtual Value *visit(ASTParam &) override final;
-    virtual Value *visit(ASTCompoundStmt &) override final;
-    virtual Value *visit(ASTExpressionStmt &) override final;
+    virtual Value *visit(ASTConstDecl &) override final;
+    virtual Value *visit(ASTConstDef &) override final;
+    virtual Value *visit(ASTConstInitVal &) override final;
+    virtual Value *visit(ASTVarDecl &) override final;
+    virtual Value *visit(ASTVarDef &) override final;
+    virtual Value *visit(ASTInitVal &) override final;
+    virtual Value *visit(ASTFuncDef &) override final;
+    virtual Value *visit(ASTFParam &) override final;
+    virtual Value *visit(ASTBlock &) override final;
+    virtual Value *visit(ASTStmt &) override final;
+    virtual Value *visit(ASTExpStmt &) override final;
+    virtual Value *visit(ASTAssignStmt &) override final;
+    virtual Value *visit(ASTBlockStmt &) override final;
     virtual Value *visit(ASTSelectionStmt &) override final;
     virtual Value *visit(ASTIterationStmt &) override final;
     virtual Value *visit(ASTReturnStmt &) override final;
-    virtual Value *visit(ASTAssignExpression &) override final;
-    virtual Value *visit(ASTSimpleExpression &) override final;
-    virtual Value *visit(ASTAdditiveExpression &) override final;
-    virtual Value *visit(ASTVar &) override final;
-    virtual Value *visit(ASTTerm &) override final;
-    virtual Value *visit(ASTCall &) override final;
+    virtual Value *visit(ASTBreakStmt &) override final;
+    virtual Value *visit(ASTContinueStmt &) override final;
+    virtual Value *visit(ASTLVal &) override final;
+    virtual Value *visit(ASTNumber &) override final;
+    virtual Value *visit(ASTExp &) override final;
+    virtual Value *visit(ASTUnaryExp &) override final;
+    virtual Value *visit(ASTBinaryExp &) override final;
+    virtual Value *visit(Cond &) override final;
+    virtual Value *visit(ASTConstExp &) override final;
     void add_depth() { depth += 2; }
     void remove_depth() { depth -= 2; }
 
