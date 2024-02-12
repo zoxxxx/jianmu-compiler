@@ -83,7 +83,7 @@ class AST {
     void run_visitor(ASTVisitor &visitor);
 
   private:
-    ASTNode *transform_node_iter(syntax_tree_node *);
+    std::shared_ptr<ASTNode> transform_node_iter(syntax_tree_node *);
     std::shared_ptr<ASTProgram> root = nullptr;
 };
 
@@ -136,7 +136,7 @@ struct ASTConstDef : ASTNode {
 struct ASTConstInitVal : ASTNode {
     virtual Value *accept(ASTVisitor &) override final;
     virtual ~ASTConstInitVal() = default;
-    bool is_empty;
+    bool is_single_exp;
     std::vector<std::shared_ptr<ASTConstInitVal>> init_vals;
     std::shared_ptr<ASTConstExp> const_exp;
 };
@@ -160,7 +160,7 @@ struct ASTVarDef : ASTNode {
 struct ASTInitVal : ASTNode {
     virtual Value *accept(ASTVisitor &) override final;
     virtual ~ASTInitVal() = default;
-    bool is_empty;
+    bool is_single_exp;
     std::vector<std::shared_ptr<ASTInitVal>> init_vals;
     std::shared_ptr<ASTExp> exp;
 };
@@ -266,10 +266,6 @@ struct ASTContinueStmt : ASTStmt {
     virtual bool is_continue_stmt() override final { return true; }
 };
 
-struct ASTFactor : ASTNode {
-    virtual ~ASTFactor() = default;
-};
-
 struct ASTLVal : ASTNode {
     virtual Value *accept(ASTVisitor &) override final;
     virtual ~ASTLVal() = default;
@@ -289,11 +285,15 @@ struct ASTExp : ASTNode {
     virtual ~ASTExp() = default;
     virtual bool is_unary_exp() { return false; }
     virtual bool is_binary_exp() { return false; }
+    virtual bool is_cond() { return false; }
 };
 
 struct ASTUnaryExp : ASTExp {
+    // 写一个构造函数
     virtual Value *accept(ASTVisitor &) override final;
     virtual ~ASTUnaryExp() = default;
+    ASTUnaryExp()
+        : exp(nullptr), l_val(nullptr), number(nullptr), func_call_id(""), has_unary_op(false) {}
     virtual bool is_unary_exp() override final { return true; }
     UnaryOp op;
     std::shared_ptr<ASTExp> exp;
@@ -305,6 +305,7 @@ struct ASTUnaryExp : ASTExp {
     bool is_l_val(){return l_val != nullptr;}
     bool is_number(){return number != nullptr;}
     bool is_func_call(){return func_call_id != "";}
+    bool is_exp(){return exp != nullptr;}
 };
 
 struct ASTBinaryExp : ASTExp {
@@ -323,10 +324,10 @@ struct ASTBinaryExp : ASTExp {
     bool is_logic_exp() { return is_logic_and_exp() || is_logic_or_exp(); }
 };
 
-struct Cond : ASTNode {
+struct ASTCond : ASTExp {
     virtual Value *accept(ASTVisitor &) override final;
-    virtual ~Cond() = default;
-    std::shared_ptr<ASTExp> exp;
+    virtual ~ASTCond() = default;
+    virtual bool is_cond() override final { return true; }
 };
 
 struct ASTConstExp : ASTNode {
@@ -363,7 +364,7 @@ class ASTVisitor {
     virtual Value *visit(ASTExp &) = 0;
     virtual Value *visit(ASTUnaryExp &) = 0;
     virtual Value *visit(ASTBinaryExp &) = 0;
-    virtual Value *visit(Cond &) = 0;
+    virtual Value *visit(ASTCond &) = 0;
     virtual Value *visit(ASTConstExp &) = 0;
 };
 
@@ -393,7 +394,7 @@ class ASTPrinter : public ASTVisitor {
     virtual Value *visit(ASTExp &) override final;
     virtual Value *visit(ASTUnaryExp &) override final;
     virtual Value *visit(ASTBinaryExp &) override final;
-    virtual Value *visit(Cond &) override final;
+    virtual Value *visit(ASTCond &) override final;
     virtual Value *visit(ASTConstExp &) override final;
     void add_depth() { depth += 2; }
     void remove_depth() { depth -= 2; }
