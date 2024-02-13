@@ -68,6 +68,7 @@ struct ASTFParam;
 struct ASTStmt;
 struct ASTLVal;
 struct ASTCond;
+struct ASTConstExp;
 
 class ASTVisitor;
 
@@ -364,7 +365,6 @@ class ASTVisitor {
     virtual Value *visit(ASTExp &) = 0;
     virtual Value *visit(ASTUnaryExp &) = 0;
     virtual Value *visit(ASTBinaryExp &) = 0;
-    virtual Value *visit(ASTCond &) = 0;
     virtual Value *visit(ASTConstExp &) = 0;
 };
 
@@ -394,7 +394,6 @@ class ASTPrinter : public ASTVisitor {
     virtual Value *visit(ASTExp &) override final;
     virtual Value *visit(ASTUnaryExp &) override final;
     virtual Value *visit(ASTBinaryExp &) override final;
-    virtual Value *visit(ASTCond &) override final;
     virtual Value *visit(ASTConstExp &) override final;
     void add_depth() { depth += 2; }
     void remove_depth() { depth -= 2; }
