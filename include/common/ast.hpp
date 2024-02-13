@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Value.hpp"
 extern "C" {
 #include "syntax_tree.h"
 extern syntax_tree *parse(const char *input);
@@ -195,7 +196,7 @@ struct ASTBlock : ASTNode {
 };
 
 struct ASTStmt : ASTNode {
-    virtual Value *accept(ASTVisitor &) override;
+    virtual Value *accept(ASTVisitor &) override = 0;
     virtual ~ASTStmt() = default;
     virtual bool is_assign_stmt() { return false; }
     virtual bool is_exp_stmt() { return false; }
@@ -282,11 +283,10 @@ struct ASTNumber : ASTNode {
 };
 
 struct ASTExp : ASTNode {
-    virtual Value *accept(ASTVisitor &) override;
+    virtual Value *accept(ASTVisitor &) override = 0;
     virtual ~ASTExp() = default;
     virtual bool is_unary_exp() { return false; }
     virtual bool is_binary_exp() { return false; }
-    virtual bool is_cond() { return false; }
 };
 
 struct ASTUnaryExp : ASTExp {
@@ -306,7 +306,6 @@ struct ASTUnaryExp : ASTExp {
     bool is_l_val(){return l_val != nullptr;}
     bool is_number(){return number != nullptr;}
     bool is_func_call(){return func_call_id != "";}
-    bool is_exp(){return exp != nullptr;}
 };
 
 struct ASTBinaryExp : ASTExp {
@@ -325,10 +324,10 @@ struct ASTBinaryExp : ASTExp {
     bool is_logic_exp() { return is_logic_and_exp() || is_logic_or_exp(); }
 };
 
-struct ASTCond : ASTExp {
+struct ASTCond : ASTNode {
     virtual Value *accept(ASTVisitor &) override final;
     virtual ~ASTCond() = default;
-    virtual bool is_cond() override final { return true; }
+    std::shared_ptr<ASTExp> exp;
 };
 
 struct ASTConstExp : ASTNode {
@@ -351,7 +350,6 @@ class ASTVisitor {
     virtual Value *visit(ASTFuncDef &) = 0;
     virtual Value *visit(ASTFParam &) = 0;
     virtual Value *visit(ASTBlock &) = 0;
-    virtual Value *visit(ASTStmt &) = 0;
     virtual Value *visit(ASTExpStmt &) = 0;
     virtual Value *visit(ASTAssignStmt &) = 0;
     virtual Value *visit(ASTBlockStmt &) = 0;
@@ -362,10 +360,10 @@ class ASTVisitor {
     virtual Value *visit(ASTContinueStmt &) = 0;
     virtual Value *visit(ASTLVal &) = 0;
     virtual Value *visit(ASTNumber &) = 0;
-    virtual Value *visit(ASTExp &) = 0;
     virtual Value *visit(ASTUnaryExp &) = 0;
     virtual Value *visit(ASTBinaryExp &) = 0;
     virtual Value *visit(ASTConstExp &) = 0;
+    virtual Value *visit(ASTCond &) = 0;
 };
 
 class ASTPrinter : public ASTVisitor {
@@ -380,7 +378,6 @@ class ASTPrinter : public ASTVisitor {
     virtual Value *visit(ASTFuncDef &) override final;
     virtual Value *visit(ASTFParam &) override final;
     virtual Value *visit(ASTBlock &) override final;
-    virtual Value *visit(ASTStmt &) override final;
     virtual Value *visit(ASTExpStmt &) override final;
     virtual Value *visit(ASTAssignStmt &) override final;
     virtual Value *visit(ASTBlockStmt &) override final;
@@ -391,10 +388,10 @@ class ASTPrinter : public ASTVisitor {
     virtual Value *visit(ASTContinueStmt &) override final;
     virtual Value *visit(ASTLVal &) override final;
     virtual Value *visit(ASTNumber &) override final;
-    virtual Value *visit(ASTExp &) override final;
     virtual Value *visit(ASTUnaryExp &) override final;
     virtual Value *visit(ASTBinaryExp &) override final;
     virtual Value *visit(ASTConstExp &) override final;
+    virtual Value *visit(ASTCond &) override final;
     void add_depth() { depth += 2; }
     void remove_depth() { depth -= 2; }
 

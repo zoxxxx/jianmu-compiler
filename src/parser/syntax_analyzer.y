@@ -76,6 +76,7 @@ syntax_tree_node *node(const char *node_name, int children_num, ...);
 %type <node> Block BlockItemList BlockItem
 %type <node> Stmt LVal Exp Cond PrimaryExp Number UnaryExp UnaryOp FuncRParams
 %type <node> MulExp AddExp RelExp EqExp LAndExp LOrExp ConstExp
+%type <node> IntConst FloatConst
 
 %nonassoc LOWER_THAN_ELSE
 %nonassoc ELSE
@@ -238,8 +239,16 @@ LP Exp RP {$$ = node("PrimaryExp", 3, $1, $2, $3);}
 ;
 
 Number :
-INTCONST {$$ = node("Number", 1, $1);}
-| FLOATCONST {$$ = node("Number", 1, $1);}
+IntConst {$$ = node("Number", 1, $1);}
+| FloatConst {$$ = node("Number", 1, $1);}
+;
+
+IntConst :
+INTCONST {$$ = node("IntConst", 1, $1);}
+;
+
+FloatConst :
+FLOATCONST {$$ = node("FloatConst", 1, $1);}
 ;
 
 UnaryExp :
@@ -341,8 +350,8 @@ syntax_tree_node *node(const char *name, int children_num, ...)
     syntax_tree_node *p = new_syntax_tree_node(name);
     syntax_tree_node *child;
     if (children_num == 0) {
-        child = new_syntax_tree_node("epsilon");
-        syntax_tree_add_child(p, child);
+        // child = new_syntax_tree_node("epsilon");
+        // syntax_tree_add_child(p, child);
     } else {
         va_list ap;
         va_start(ap, children_num);
