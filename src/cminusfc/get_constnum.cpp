@@ -6,76 +6,30 @@
 #include "Type.hpp"
 #include "ast.hpp"
 #include "logging.hpp"
+#include "get_constnum.hpp"
 #include <algorithm>
 
-struct ConstStruct{
-    int type; // 1 int 2 float 3 arrayint 4 arrayflaot
-    vector <int> dim; // if array, dimesion is in here
-    vector <int> DataI; // store confirmed data in array
-    vector <float> DataF;
-    union{
-        int ConstInt;
-        float ConstFp;
-    }SingleData;
-};
-
-class myScope {
-  public:
-    // enter a new scope
-    void enter() { inner.emplace_back(); }
-
-    // exit a scope
-    void exit() { inner.pop_back(); }
-
-    bool in_global() { return inner.size() == 1; }
-
-    // push a name to scope
-    // return true if successful
-    // return false if this name already exits
-    bool push(const std::string& name, ConstStruct* val) {
-        auto result = inner[inner.size() - 1].insert({name, val});
-        return result.second;
-    }
-
-    ConstStruct* find(const std::string& name) {
-        for (auto s = inner.rbegin(); s != inner.rend(); s++) {
-            auto iter = s->find(name);
-            if (iter != s->end()) {
-                return iter->second;
-            }
-        }
-
-        // Name not found: handled here?
-        assert(false && "Name not found in scope");
-
-        return nullptr;
-    }
-
-  private:
-    std::vector<std::map<std::string, ConstStruct*> > inner;
-}myscope;
-
-ConstStruct* CminusfBuilder::visit(ASTProgram &node) {
+ConstStruct* GetConst::visit(ASTProgram &node) {
     (node.Vec[0])->accept(*this);
     return null;
 }
 
-ConstStruct* CminusfBuilder::visit(ASTStmt &node){
+ConstStruct* GetConst::visit(ASTStmt &node){
     return null;
 }
-ConstStruct* CminusfBuilder::visit(ASTFuncDef &node){
+ConstStruct* GetConst::visit(ASTFuncDef &node){
     return null;
 }
-ConstStruct* CminusfBuilder::visit(ASTConstDecl &node){
+ConstStruct* GetConst::visit(ASTConstDecl &node){
     for(auto &nxt:node.const_defs){
         nxt->accept(*this);
     }
     return null;
 }
-ConstStruct* CminusfBuilder::visit(ASTVarDecl &node){
+ConstStruct* GetConst::visit(ASTVarDecl &node){
     return null;
 }
-ConstStruct* CminusfBuilder::visit(ASTConstDef &node){
+ConstStruct* GetConst::visit(ASTConstDef &node){
     ConstStruct* ConstMessage = new ConstStruct;
     if(node.is_array){
         for(auto &nxt : node.array_size){
@@ -118,7 +72,7 @@ ConstStruct* CminusfBuilder::visit(ASTConstDef &node){
     //这里需要添加把ConstMessage加入AST该结点中
     return null;
 }
-ConstStruct* CminusfBuilder::visit(ASTConstInitVal &node){
+ConstStruct* GetConst::visit(ASTConstInitVal &node){
     auto lstpos = context.nowpos;
     int pos = context.frontpos+1;
     int lstpos = context.frontpos; //因为递归，所以需要记录一下
@@ -161,35 +115,47 @@ ConstStruct* CminusfBuilder::visit(ASTConstInitVal &node){
     context.frontpos = lstpos;
 }
 
-ConstStruct* CminusfBuilder::visit(ASTVarDefList &node){
+ConstStruct* GetConst::visit(ASTVarDefList &node){
     return null;
 }
-ConstStruct* CminusfBuilder::visit(ASTVarDef &node){
+ConstStruct* GetConst::visit(ASTVarDef &node){
     return null;
 }
-ConstStruct* CminusfBuilder::visit(ASTInitVal &node){
+ConstStruct* GetConst::visit(ASTInitVal &node){
     return null;
 }
-ConstStruct* CminusfBuilder::visit(ASTBlock &node){
+ConstStruct* GetConst::visit(ASTBlock &node){
     scope.enter();
     for(auto &nxt : decls_and_stmts){
         nxt->accept(*this);
     }
     scope.exit();
 }
-ConstStruct* CminusfBuilder::visit(ASTFuncFParam &node){
+ConstStruct* GetConst::visit(ASTFuncFParam &node){
     return null;
 }
 
-ConstStruct* CminusfBuilder::visit(ASTLVal &node){
-    //todo
+ConstStruct* GetConst::visit(ASTLVal &node){
+    ConstStruct* now = myscope.find(node.id);
+    int pos = 0;
+    int ct = 0;
+    for(auto &nxt : array_exp){
+        auto *dt = nxt -> accept(*this);
+        pos = pos * now->dim[ct] + dt->SingleData->ConstInt;
+        ct++;
+    }
+    ConstStruct* res = new ConstStruct;
+    res->type = now->type - 2;
+    if(res->type == 1) res->SingleData->ConstInt = now->DataI[pos];
+    else res->SingleData->ConstFp = now->DataF[pos];
+    return res;
 }
-ConstStruct* CminusfBuilder::visit(ASTCond &node){
+ConstStruct* GetConst::visit(ASTCond &node){
     return node.lorexp->accept(*this);
 }
     
     
-ConstStruct* CminusfBuilder::visit(ASTAddExp &node){
+ConstStruct* GetConst::visit(ASTAddExp &node){
     auto r1 = node.opcode1 -> accept(*this);
     auto r2 = node.opcode2 -> accept(*this);
     ConstStruct* rr = new ConstStruct;
@@ -220,7 +186,7 @@ ConstStruct* CminusfBuilder::visit(ASTAddExp &node){
     delete r2;
     return rr;
 }
-ConstStruct* CminusfBuilder::visit(ASTLOrExp &node){
+ConstStruct* GetConst::visit(ASTLOrExp &node){
     auto r1 = node.opcode1 -> accept(*this);
     auto r2 = node.opcode2 -> accept(*this);
     ConstStruct* rr = new ConstStruct;
@@ -243,28 +209,105 @@ ConstStruct* CminusfBuilder::visit(ASTLOrExp &node){
     return rr;
 }
 
-ConstStruct* CminusfBuilder::visit(ASTIntConst &node){
-    ConstStruct* NumRec = new ConstStruct;
-    NumRec->type = 1;
-    NumRec->SingleData.ConstInt = node.num;
-    return NumRec;
-}
-ConstStruct* CminusfBuilder::visit(ASTFloatConst &node){
-    ConstStruct* NumRec = new ConstStruct;
-    NumRec.type = 2;
-    NumRec->SingleData.ConstFp = node.num;
-    return NumRec;
-}
-ConstStruct* CminusfBuilder::visit(ASTUnaryExp &node){
-    //todo
+ConstStruct* GetConst::visit(ASTNumber &node){
+    if(node.type == TYPE_INT){
+        ConstStruct* NumRec = new ConstStruct;
+        NumRec->type = 1;
+        NumRec->SingleData.ConstInt = node.value;
+        return NumRec;
+    }else{
+        ConstStruct* NumRec = new ConstStruct;
+        NumRec->type = 2;
+        NumRec->SingleData.ConstFp = node.value;
+        return NumRec;
+    }
 }
 
-ConstStruct* CminusfBuilder::visit(ASTBinaryExp &node){
+ConstStruct* GetConst::visit(ASTUnaryExp &node){
+    if(node.has_unary_op == true){
+        ConstStruct* NumRec = node.exp -> accept(*this);y
+        if(node.op == OP_POS){
+            return NumRec;
+        }else if(node.op == OP_NEG){
+            if(NumRec->op == 1){
+                NumRec->SingleData.ConstInt *= -1;
+            }else{
+                NumRec->SingleData.ConstFp *= -1;
+            }
+            return NumRec;
+        }else{
+            if(NumRec->op == 1){
+                NumRec->SingleData.ConstInt = !NumRec.SingleData.ConstInt;
+            }else{
+                NumRec->SingleData.ConstFp = !NumRec.SingleData.ConstFp;
+            }
+            return NumRec;
+        }
+    }else{
+        if(node.is_func_call()){
+            return null;
+        }else{
+            if(node.is_number()){
+                return node.number ->accept(*this);
+            }else{
+                return node.l_val ->accept(*this);
+            }
+        }
+    }
+}
+
+ConstStruct* GetConst::visit(ASTBinaryExp &node){
     auto r1 = node.opcode1 -> accept(*this);
     auto r2 = node.opcode2 -> accept(*this);
     ConstStruct* rr = new ConstStruct;
     if(node.is_bool_exp()){
+        rr->type = 1;
+        if(r1->type == 2 || r2->type == 2){
+            if(r1->type == 1) {
+                r1->type = 2;
+                r1->SingleData.ConstFp = r1->SingleData.ConstInt;
+            }
+            if(r2->type == 1) {
+                r2->type = 2;
+                r2->SingleData.ConstFp = r2->SingleData.ConstInt;
+            }
+            if(node.op == OP_LE){
+                rr->SingleData.ConstInt = r1->SingleData.ConstFp <= r2->SingleData.ConstFp;
+            }else if(node.op == OP_GE){
+                rr->SingleData.ConstInt = r1->SingleData.ConstFp >= r2->SingleData.ConstFp;
+            }else if(node.op == OP_LT){
+                rr->SingleData.ConstInt = r1->SingleData.ConstFp < r2->SingleData.ConstFp;
+            }else if(node.op == OP_GT){
+                rr->SingleData.ConstInt = r1->SingleData.ConstFp > r2->SingleData.ConstFp;
+            }else if(node.op == OP_EQ){
+                rr->SingleData.ConstInt = r1->SingleData.ConstFp == r2->SingleData.ConstFp;
+            }else if(node.op == OP_NEQ){
+                rr->SingleData.ConstInt = r1->SingleData.ConstFp != r2->SingleData.ConstFp;
+            }else if(node.op == OP_AND){
+                rr->SingleData.ConstInt = r1->SingleData.ConstFp && r2->SingleData.ConstFp;
+            }else if(node.op == OP_OR){
+                rr->SingleData.ConstInt = r1->SingleData.ConstFp || r2->SingleData.ConstFp;
+            }
         
+        }else{
+            if(node.op == OP_LE){
+                rr->SingleData.ConstInt = r1->SingleData.ConstInt <= r2->SingleData.ConstInt;
+            }else if(node.op == OP_GE){
+                rr->SingleData.ConstInt = r1->SingleData.ConstInt >= r2->SingleData.ConstInt;
+            }else if(node.op == OP_LT){
+                rr->SingleData.ConstInt = r1->SingleData.ConstInt < r2->SingleData.ConstInt;
+            }else if(node.op == OP_GT){
+                rr->SingleData.ConstInt = r1->SingleData.ConstInt > r2->SingleData.ConstInt;
+            }else if(node.op == OP_EQ){
+                rr->SingleData.ConstInt = r1->SingleData.ConstInt == r2->SingleData.ConstInt;
+            }else if(node.op == OP_NEQ){
+                rr->SingleData.ConstInt = r1->SingleData.ConstInt != r2->SingleData.ConstInt;
+            }else if(node.op == OP_AND){
+                rr->SingleData.ConstInt = r1->SingleData.ConstInt && r2->SingleData.ConstInt;
+            }else if(node.op == OP_OR){
+                rr->SingleData.ConstInt = r1->SingleData.ConstInt || r2->SingleData.ConstInt;
+            }
+        }
     }else{
         if(r1->type == 2 || r2->type == 2){
             rr->type = 2;
@@ -290,108 +333,17 @@ ConstStruct* CminusfBuilder::visit(ASTBinaryExp &node){
         }else{
             rr->type = 1;
             if(node.op == OP_MUL){
-                rr->SingleData.ConstFp = r1->SingleData.ConstFp * r2->SingleData.ConstFp;
+                rr->SingleData.ConstInt = r1->SingleData.ConstInt * r2->SingleData.ConstInt;
             }else if(node.op == OP_DIV){
-                rr->SingleData.ConstFp = r1->SingleData.ConstFp / r2->SingleData.ConstFp;
+                rr->SingleData.ConstInt = r1->SingleData.ConstInt / r2->SingleData.ConstInt;
             }else if(node.op == OP_MOD){
-                rr->SingleData.ConstFp = r1->SingleData.ConstFp % r2->SingleData.ConstFp;
+                rr->SingleData.ConstInt = r1->SingleData.ConstInt % r2->SingleData.ConstInt;
             }else if(node.op == OP_PLUS){
-                rr->SingleData.ConstFp = r1->SingleData.ConstFp + r2->SingleData.ConstFp;
+                rr->SingleData.ConstInt = r1->SingleData.ConstInt + r2->SingleData.ConstInt;
             }else if(node.op == OP_MINUS){
-                rr->SingleData.ConstFp = r1->SingleData.ConstFp - r2->SingleData.ConstFp;
+                rr->SingleData.ConstInt = r1->SingleData.ConstInt - r2->SingleData.ConstInt;
             }
         }
-    }
-    delete r1;
-    delete r2;
-    return rr;
-}
-ConstStruct* CminusfBuilder::visit(ASTRelExp &node){
-    auto r1 = node.opcode1 -> accept(*this);
-    auto r2 = node.opcode2 -> accept(*this);
-    ConstStruct* rr = new ConstStruct;
-    rr->type = 1;
-    if(r1->type == 2 || r2->type == 2){
-        if(r1->type == 1) {
-            r1->type = 2;
-            r1->SingleData.ConstFp = r1->SingleData.ConstInt;
-        }
-        if(r2->type == 1) {
-            r2->type = 2;
-            r2->SingleData.ConstFp = r2->SingleData.ConstInt;
-        }
-        if(node.op == OP_LE){
-            rr->SingleData.ConstInt = r1->SingleData.ConstFp <= r2->SingleData.ConstFp;
-        }else if(node.op == OP_GE){
-            rr->SingleData.ConstInt = r1->SingleData.ConstFp >= r2->SingleData.ConstFp;
-        }else if(node.op == OP_LT){
-            rr->SingleData.ConstInt = r1->SingleData.ConstFp < r2->SingleData.ConstFp;
-        }else if(node.op == OP_GT){
-            rr->SingleData.ConstInt = r1->SingleData.ConstFp > r2->SingleData.ConstFp;
-        }
-        
-    }else{
-        if(node.op == OP_LE){
-            rr->SingleData.ConstInt = r1->SingleData.ConstInt <= r2->SingleData.ConstInt;
-        }else if(node.op == OP_GE){
-            rr->SingleData.ConstInt = r1->SingleData.ConstInt >= r2->SingleData.ConstInt;
-        }else if(node.op == OP_LT){
-            rr->SingleData.ConstInt = r1->SingleData.ConstInt < r2->SingleData.ConstInt;
-        }else if(node.op == OP_GT){
-            rr->SingleData.ConstInt = r1->SingleData.ConstInt > r2->SingleData.ConstInt;
-        }
-    }
-    delete r1;
-    delete r2;
-    return rr;
-}
-ConstStruct* CminusfBuilder::visit(ASTEqExp &node){
-    auto r1 = node.opcode1 -> accept(*this);
-    auto r2 = node.opcode2 -> accept(*this);
-    ConstStruct* rr = new ConstStruct;
-    rr->type = 1;
-    if(r1->type == 2 || r2->type == 2){
-        if(r1->type == 1) {
-            r1->type = 2;
-            r1->SingleData.ConstFp = r1->SingleData.ConstInt;
-        }
-        if(r2->type == 1) {
-            r2->type = 2;
-            r2->SingleData.ConstFp = r2->SingleData.ConstInt;
-        }
-        if(node.op == OP_EQ){
-            rr->SingleData.ConstInt = (r1->SingleData.ConstFp == r2->SingleData.ConstFp);
-        }else if(node.op == OP_NE){
-            rr->SingleData.ConstInt = (r1->SingleData.ConstFp != r2->SingleData.ConstFp);
-        }
-    }else{
-        if(node.op == OP_EQ){
-            rr->SingleData.ConstInt = (r1->SingleData.ConstInt == r2->SingleData.ConstInt);
-        }else if(node.op == OP_NE){
-            rr->SingleData.ConstInt = (r1->SingleData.ConstInt != r2->SingleData.ConstInt);
-        }
-    }
-    delete r1;
-    delete r2;
-    return rr;
-}
-ConstStruct* CminusfBuilder::visit(ASTLAndExp &node){
-    auto r1 = node.lhs -> accept(*this);
-    auto r2 = node.rhs -> accept(*this);
-    ConstStruct* rr = new ConstStruct;
-    rr->type = 1;
-    if(r1->type == 2 || r2->type == 2){
-        if(r1->type == 1) {
-            r1->type = 2;
-            r1->SingleData.ConstFp = r1->SingleData.ConstInt;
-        }
-        if(r2->type == 1) {
-            r2->type = 2;
-            r2->SingleData.ConstFp = r2->SingleData.ConstInt;
-        }
-        rr->SingleData.ConstInt = (r1->SingleData.ConstFp && r2->SingleData.ConstFp);
-    }else{
-        rr->SingleData.ConstInt = (r1->SingleData.ConstInt && r2->SingleData.ConstInt);
     }
     delete r1;
     delete r2;
