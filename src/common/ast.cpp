@@ -17,6 +17,7 @@
 #define _STR_EQ(a, b) (strcmp((a), (b)) == 0)
 
 void AST::run_visitor(ASTVisitor &visitor) { root->accept(visitor); }
+void AST::run_visitor(ASTVisitor2 &visitor) { root->accept(visitor); }
 
 AST::AST(syntax_tree *s) {
     if (s == nullptr) {
@@ -591,6 +592,32 @@ Value* ASTNumber::accept(ASTVisitor &visitor) { return visitor.visit(*this); }
 Value* ASTLVal::accept(ASTVisitor &visitor) { return visitor.visit(*this); }
 Value* ASTConstExp::accept(ASTVisitor &visitor) { return visitor.visit(*this); }
 Value* ASTCond::accept(ASTVisitor &visitor) { return visitor.visit(*this); }
+
+ConstStruct* ASTProgram::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTConstDecl::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTVarDecl::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTFuncDef::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTConstDef::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTVarDef::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTConstInitVal::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTInitVal::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTFParam::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTBlock::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTAssignStmt::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTExpStmt::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTBlockStmt::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTBreakStmt::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTContinueStmt::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTSelectionStmt::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTIterationStmt::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTReturnStmt::accept(ASTVisitor2 &visitor) {return visitor.visit(*this); }
+ConstStruct* ASTUnaryExp::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTBinaryExp::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTNumber::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTLVal::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTConstExp::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+ConstStruct* ASTCond::accept(ASTVisitor2 &visitor) { return visitor.visit(*this); }
+
 
 #define _DEBUG_PRINT_N_(N)                                                     \
     { std::cout << std::string(N, '-'); }

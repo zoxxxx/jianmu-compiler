@@ -9,26 +9,23 @@
 #include "get_constnum.hpp"
 #include <algorithm>
 
+#define null NULL
+
 ConstStruct* GetConst::visit(ASTProgram &node) {
-    (node.Vec[0])->accept(*this);
+    for(auto &nxt : node.defs_and_decls){
+        nxt ->accept(*this);
+    }
     return null;
 }
 
-ConstStruct* GetConst::visit(ASTStmt &node){
-    return null;
-}
-ConstStruct* GetConst::visit(ASTFuncDef &node){
-    return null;
-}
+
 ConstStruct* GetConst::visit(ASTConstDecl &node){
     for(auto &nxt:node.const_defs){
         nxt->accept(*this);
     }
     return null;
 }
-ConstStruct* GetConst::visit(ASTVarDecl &node){
-    return null;
-}
+
 ConstStruct* GetConst::visit(ASTConstDef &node){
     ConstStruct* ConstMessage = new ConstStruct;
     if(node.is_array){
@@ -72,6 +69,8 @@ ConstStruct* GetConst::visit(ASTConstDef &node){
     //这里需要添加把ConstMessage加入AST该结点中
     return null;
 }
+
+
 ConstStruct* GetConst::visit(ASTConstInitVal &node){
     auto lstpos = context.nowpos;
     int pos = context.frontpos+1;
@@ -115,15 +114,26 @@ ConstStruct* GetConst::visit(ASTConstInitVal &node){
     context.frontpos = lstpos;
 }
 
-ConstStruct* GetConst::visit(ASTVarDefList &node){
-    return null;
+ConstStruct* GetConst::visit(ASTVarDecl &node){
+    return NULL;
 }
+
 ConstStruct* GetConst::visit(ASTVarDef &node){
-    return null;
+    return NULL;
 }
+
 ConstStruct* GetConst::visit(ASTInitVal &node){
     return null;
 }
+
+ConstStruct* GetConst::visit(ASTFuncDef &node){
+    node.block -> accept(*this);
+}
+
+ConstStruct* GetConst::visit(ASTFParam &node) {
+    return null;
+}
+
 ConstStruct* GetConst::visit(ASTBlock &node){
     scope.enter();
     for(auto &nxt : decls_and_stmts){
@@ -131,8 +141,30 @@ ConstStruct* GetConst::visit(ASTBlock &node){
     }
     scope.exit();
 }
-ConstStruct* GetConst::visit(ASTFuncFParam &node){
-    return null;
+
+ConstStruct* GetConst::visit(ASTExpStmt &node) {
+    return NULL;
+}
+ConstStruct* GetConst::visit(ASTAssignStmt &node){
+    return NULL;
+}
+ConstStruct* GetConst::visit(ASTBlockStmt &node){
+    return NULL;
+}
+ConstStruct* GetConst::visit(ASTSelectionStmt &node){
+    return NULL;
+}
+ConstStruct* GetConst::visit(ASTIterationStmt &node) {
+    return NULL;
+}
+ConstStruct* GetConst::visit(ASTReturnStmt &node){
+    return NULL;
+}
+ConstStruct* GetConst::visit(ASTBreakStmt &node) {
+    return NULL;
+}
+ConstStruct* GetConst::visit(ASTContinueStmt &node) {
+    return NULL;
 }
 
 ConstStruct* GetConst::visit(ASTLVal &node){
@@ -150,64 +182,7 @@ ConstStruct* GetConst::visit(ASTLVal &node){
     else res->SingleData->ConstFp = now->DataF[pos];
     return res;
 }
-ConstStruct* GetConst::visit(ASTCond &node){
-    return node.lorexp->accept(*this);
-}
-    
-    
-ConstStruct* GetConst::visit(ASTAddExp &node){
-    auto r1 = node.opcode1 -> accept(*this);
-    auto r2 = node.opcode2 -> accept(*this);
-    ConstStruct* rr = new ConstStruct;
-    if(r1->type == 2 || r2->type == 2){
-        rr->type = 2;
-        if(r1->type == 1) {
-            r1->type = 2;
-            r1->SingleData.ConstFp = r1->SingleData.ConstInt;
-        }
-        if(r2->type == 1) {
-            r2->type = 2;
-            r2->SingleData.ConstFp = r2->SingleData.ConstInt;
-        }
-        if(node.op == OP_ADD){
-            rr->SingleData.ConstFp = r1->SingleData.ConstFp + r2->SingleData.ConstFp;
-        }else if(node.op == OP_SUB){
-            rr->SingleData.ConstFp = r1->SingleData.ConstFp - r2->SingleData.ConstFp;
-        }
-    }else{
-        rr->type = 1;
-        if(node.op == OP_ADD){
-            rr->SingleData.ConstInt = r1->SingleData.ConstInt + r2->SingleData.ConstInt;
-        }else if(node.op == OP_SUB){
-            rr->SingleData.ConstInt = r1->SingleData.ConstInt - r2->SingleData.ConstInt;
-        }
-    }
-    delete r1;
-    delete r2;
-    return rr;
-}
-ConstStruct* GetConst::visit(ASTLOrExp &node){
-    auto r1 = node.opcode1 -> accept(*this);
-    auto r2 = node.opcode2 -> accept(*this);
-    ConstStruct* rr = new ConstStruct;
-    rr->type = 1;
-    if(r1->type == 2 || r2->type == 2){
-        if(r1->type == 1) {
-            r1->type = 2;
-            r1->SingleData.ConstFp = r1->SingleData.ConstInt;
-        }
-        if(r2->type == 1) {
-            r2->type = 2;
-            r2->SingleData.ConstFp = r2->SingleData.ConstInt;
-        }
-        rr->SingleData.ConstInt = (r1->SingleData.ConstFp || r2->SingleData.ConstFp);
-    }else{
-        rr->SingleData.ConstInt = (r1->SingleData.ConstInt || r2->SingleData.ConstInt);
-    }
-    delete r1;
-    delete r2;
-    return rr;
-}
+
 
 ConstStruct* GetConst::visit(ASTNumber &node){
     if(node.type == TYPE_INT){
@@ -254,6 +229,14 @@ ConstStruct* GetConst::visit(ASTUnaryExp &node){
             }
         }
     }
+}
+
+ConstStruct* GetConst::visit(ASTCond &node){
+    return node.lorexp->accept(*this);
+}
+
+ConstStruct* GetConst::visit(ASTConstExp &node){
+    return node.exp->accept(*this);
 }
 
 ConstStruct* GetConst::visit(ASTBinaryExp &node){

@@ -1,13 +1,7 @@
-struct ConstStruct{
-    int type; // 1 int 2 float 3 arrayint 4 arrayflaot
-    vector <int> dim; // if array, dimesion is in here
-    vector <int> DataI; // store confirmed data in array
-    vector <float> DataF;
-    union{
-        int ConstInt;
-        float ConstFp;
-    }SingleData;
-};
+#include<vector>
+#include<map>
+#include "ast.hpp"
+
 
 class myScope {
 public:
@@ -34,10 +28,7 @@ public:
                 return iter->second;
             }
         }
-
-        // Name not found: handled here?
-        assert(false && "Name not found in scope");
-
+        
         return nullptr;
     }
 
@@ -45,7 +36,7 @@ private:
     std::vector<std::map<std::string, ConstStruct*> > inner;
 };
 
-class GetConst : public ASTVisitor {
+class GetConst : public ASTVisitor2 {
 public:
 private:
     virtual ConstStruct *visit(ASTProgram &) override final;
