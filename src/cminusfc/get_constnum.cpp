@@ -83,22 +83,22 @@ ConstStruct* CminusfBuilder::visit(ASTConstDef &node){
             ConstMessage->dim.push_back(size->SingleData.ConstInt); //size
         }
         int MAXN = 1;
-        for(auto x : ConstMessage.dim) MAXN *= x; //Çó³öÊı×é´óĞ¡
+        for(auto x : ConstMessage.dim) MAXN *= x; //æ±‚å‡ºæ•°ç»„å¤§å°
         if(node.type == TYPE_INT){
             ConstMessage -> type = 3;
             ConstMessage.DataI.resize(MAXN,0);
             context.Record = ConstMessage; 
-            context.nowpos.resize(dim.size(),0); //µ±Ç°µÄÎ»ÖÃ£¬È«²¿³õÊ¼»¯Îª0
-            context.frontpos = -1; //²»¿´±È0µÍµÄÎ»
+            context.nowpos.resize(dim.size(),0); //å½“å‰çš„ä½ç½®ï¼Œå…¨éƒ¨åˆå§‹åŒ–ä¸º0
+            context.frontpos = -1; //ä¸çœ‹æ¯”0ä½çš„ä½
             for(auto &nxt : ConstMessage.init_vals){
                 nxt -> accept(*this);
             }
         }else {
             ConstMessage -> type = 4;
             ConstMessage.DataF.resize(MAXN,0);
-            context.Record = ConstMessage; //¼ÇÂ¼Ò»ÏÂÏÂÃæ¸Ä
-            context.nowpos.resize(dim.size(),0); //µ±Ç°µÄÎ»ÖÃ£¬È«²¿³õÊ¼»¯Îª0
-            context.frontpos = -1; //²»¿´±È0µÍµÄÎ»
+            context.Record = ConstMessage; //è®°å½•ä¸€ä¸‹ä¸‹é¢æ”¹
+            context.nowpos.resize(dim.size(),0); //å½“å‰çš„ä½ç½®ï¼Œå…¨éƒ¨åˆå§‹åŒ–ä¸º0
+            context.frontpos = -1; //ä¸çœ‹æ¯”0ä½çš„ä½
             for(auto &nxt : ConstMessage.init_vals){
                 nxt -> accept(*this);
             }
@@ -115,19 +115,19 @@ ConstStruct* CminusfBuilder::visit(ASTConstDef &node){
         }
     }
     myscope.push(node.id,ConstMessage);
-    //ÕâÀïĞèÒªÌí¼Ó°ÑConstMessage¼ÓÈëAST¸Ã½áµãÖĞ
+    //è¿™é‡Œéœ€è¦æ·»åŠ æŠŠConstMessageåŠ å…¥ASTè¯¥ç»“ç‚¹ä¸­
     return null;
 }
 ConstStruct* CminusfBuilder::visit(ASTConstInitVal &node){
     auto lstpos = context.nowpos;
     int pos = context.frontpos+1;
-    int lstpos = context.frontpos; //ÒòÎªµİ¹é£¬ËùÒÔĞèÒª¼ÇÂ¼Ò»ÏÂ
+    int lstpos = context.frontpos; //å› ä¸ºé€’å½’ï¼Œæ‰€ä»¥éœ€è¦è®°å½•ä¸€ä¸‹
     for(int i=pos;i<context.nowpos.size();i++) if(context.nowpos[i]) pos = i;
     if(is_empty){
         context.nowpos = lstpos;
         context.nowpos[pos] ++;
     }else if(init_vals.size() == 0){
-        //°ÑÊıÌî½øÈ¥ context.Record
+        //æŠŠæ•°å¡«è¿›å» context.Record
         int finalpos = 0;
         for(int i=0;i<context.nowpos.size();i++){
             finalpos = finalpos * context.Record->dim[i] + cotext.nowpos[i];
