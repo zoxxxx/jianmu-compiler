@@ -10,6 +10,7 @@ extern syntax_tree *parse(const char *input);
 #include <string>
 #include <vector>
 #include <variant>
+#include "get_constnum.hpp"
 
 enum SysyType { TYPE_INT, TYPE_FLOAT, TYPE_VOID };
 
@@ -70,6 +71,17 @@ struct ASTStmt;
 struct ASTLVal;
 struct ASTCond;
 struct ASTConstExp;
+struct ASTExpStmt;
+struct ASTAssignStmt;
+struct ASTBlockStmt;
+struct ASTSelectionStmt;
+struct ASTIterationStmt;
+struct ASTReturnStmt;
+struct ASTBreakStmt;
+struct ASTContinueStmt;
+struct ASTNumber;
+struct ASTUnaryExp;
+struct ASTBinaryExp;
 
 class ASTVisitor;
 
@@ -133,6 +145,7 @@ struct ASTConstDef : ASTNode {
     std::vector<std::shared_ptr<ASTConstExp>> array_size;
     // actually if it is an array, the vector should have size larger than 0
     std::shared_ptr<ASTConstInitVal> init_val;
+    ConstStruct* const_struct = nullptr;
 };
 
 struct ASTConstInitVal : ASTNode {

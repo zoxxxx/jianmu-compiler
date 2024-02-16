@@ -10,9 +10,9 @@
 
 struct ConstStruct{
     int type; // 1 int 2 float 3 arrayint 4 arrayflaot
-    vector <int> dim; // if array, dimesion is in here
-    vector <int> DataI; // store confirmed data in array
-    vector <float> DataF;
+    std::vector <int> dim; // if array, dimesion is in here
+    std::vector <int> DataI; // store confirmed data in array
+    std::vector <float> DataF;
     union{
         int ConstInt;
         float ConstFp;
@@ -57,23 +57,23 @@ class myScope {
 
 ConstStruct* CminusfBuilder::visit(ASTProgram &node) {
     (node.Vec[0])->accept(*this);
-    return null;
+    return nullptr;
 }
 
 ConstStruct* CminusfBuilder::visit(ASTStmt &node){
-    return null;
+    return nullptr;
 }
 ConstStruct* CminusfBuilder::visit(ASTFuncDef &node){
-    return null;
+    return nullptr;
 }
 ConstStruct* CminusfBuilder::visit(ASTConstDecl &node){
     for(auto &nxt:node.const_defs){
         nxt->accept(*this);
     }
-    return null;
+    return nullptr;
 }
 ConstStruct* CminusfBuilder::visit(ASTVarDecl &node){
-    return null;
+    return nullptr;
 }
 ConstStruct* CminusfBuilder::visit(ASTConstDef &node){
     ConstStruct* ConstMessage = new ConstStruct;
@@ -116,7 +116,7 @@ ConstStruct* CminusfBuilder::visit(ASTConstDef &node){
     }
     myscope.push(node.id,ConstMessage);
     //这里需要添加把ConstMessage加入AST该结点中
-    return null;
+    return nullptr;
 }
 ConstStruct* CminusfBuilder::visit(ASTConstInitVal &node){
     auto lstpos = context.nowpos;
@@ -162,13 +162,13 @@ ConstStruct* CminusfBuilder::visit(ASTConstInitVal &node){
 }
 
 ConstStruct* CminusfBuilder::visit(ASTVarDefList &node){
-    return null;
+    return nullptr;
 }
 ConstStruct* CminusfBuilder::visit(ASTVarDef &node){
-    return null;
+    return nullptr;
 }
 ConstStruct* CminusfBuilder::visit(ASTInitVal &node){
-    return null;
+    return nullptr;
 }
 ConstStruct* CminusfBuilder::visit(ASTBlock &node){
     scope.enter();
@@ -178,7 +178,7 @@ ConstStruct* CminusfBuilder::visit(ASTBlock &node){
     scope.exit();
 }
 ConstStruct* CminusfBuilder::visit(ASTFuncFParam &node){
-    return null;
+    return nullptr;
 }
 
 ConstStruct* CminusfBuilder::visit(ASTLVal &node){
@@ -255,6 +255,7 @@ ConstStruct* CminusfBuilder::visit(ASTFloatConst &node){
     NumRec->SingleData.ConstFp = node.num;
     return NumRec;
 }
+
 ConstStruct* CminusfBuilder::visit(ASTUnaryExp &node){
     //todo
 }
