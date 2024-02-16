@@ -53,7 +53,7 @@ inherite CminusfBuilder::visit(ASTStmt &node){
 inherite CminusfBuilder::visit(ASTFuncDef &node) ;
 inherite CminusfBuilder::visit(ASTConstDecl &node){
     inherite leaftype = (node.Vec[0])->accept(*this);
-    context.vartype = leaftype.DownType; //°Ñ×ÛºÏÊôÐÔµÄÀàÐÍµ±³É¼Ì³ÐÊôÐÔ´«¸øÁÐ±í
+    context.vartype = leaftype.DownType; //æŠŠç»¼åˆå±žæ€§çš„ç±»åž‹å½“æˆç»§æ‰¿å±žæ€§ä¼ ç»™åˆ—è¡¨
     (node.Vec[1])->accept(*this);
 }
 inherite CminusfBuilder::visit(ASTVarDecl &) ;
@@ -80,7 +80,7 @@ inherite CminusfBuilder::visit(ASTConstDef &node){
     inherite ConstInitValS = (node.Vec[2])->accept(*this);
     if(ConstExpListS.is_empty == 1){ //not array
         if(scope.in_global()){
-            scope.push(node.id, GlobalVariable::create(node.id, module.get(), var_type, true, ConstInitValS.Data)); //global³õÊ¼»¯»á×Ô´østore
+            scope.push(node.id, GlobalVariable::create(node.id, module.get(), var_type, true, ConstInitValS.Data)); //globalåˆå§‹åŒ–ä¼šè‡ªå¸¦store
         }else{
             auto ptr = builder->create_alloca(var_type);
             builder->create_store(ptr,ConstInitValS.Data);
