@@ -38,7 +38,6 @@ private:
 
 class GetConst : public ASTVisitor2 {
 public:
-private:
     virtual ConstStruct *visit(ASTProgram &) override final;
     virtual ConstStruct *visit(ASTConstDecl &) override final;
     virtual ConstStruct *visit(ASTConstDef &) override final;
@@ -64,4 +63,5 @@ private:
     virtual ConstStruct *visit(ASTConstExp &) override final;
     virtual ConstStruct *visit(ASTCond &) override final;
     myScope myscope;
+private:
 };
