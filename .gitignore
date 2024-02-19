@@ -2,6 +2,7 @@ build/
 .cache/
 .VSCodeCounter/
 .vscode/
+.clang-format
 tests/functional
 tests/performance
 tests/hidden_functional

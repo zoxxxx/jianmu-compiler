@@ -1,22 +1,17 @@
 #pragma once
 
+#include <map>
+#include <memory>
+#include <utility>
+
 #include "BasicBlock.hpp"
 #include "Constant.hpp"
 #include "Function.hpp"
 #include "IRBuilder.hpp"
 #include "Module.hpp"
 #include "Type.hpp"
+#include "Value.hpp"
 #include "ast.hpp"
-
-#include <map>
-#include <memory>
-
-struct inherite{
-    int DownType;
-    int is_empty;
-    Value* Data;
-    
-};
 
 class Scope {
   public:
@@ -31,12 +26,13 @@ class Scope {
     // push a name to scope
     // return true if successful
     // return false if this name already exits
-    bool push(const std::string& name, Value *val) {
-        auto result = inner[inner.size() - 1].insert({name, val});
+    bool push(const std::string &name, Value *val, bool is_const_decl = false) {
+        auto result = inner[inner.size() - 1].insert(
+            {name, std::make_pair(val, is_const_decl)});
         return result.second;
     }
 
-    Value *find(const std::string& name) {
+    std::pair<Value *, bool> find(const std::string &name) {
         for (auto s = inner.rbegin(); s != inner.rend(); s++) {
             auto iter = s->find(name);
             if (iter != s->end()) {
@@ -46,12 +42,11 @@ class Scope {
 
         // Name not found: handled here?
         assert(false && "Name not found in scope");
-
-        return nullptr;
+        return std::make_pair(nullptr, false);
     }
 
   private:
-    std::vector<std::map<std::string, Value *>> inner;
+    std::vector<std::map<std::string, std::pair<Value *, bool>>> inner;
 };
 
 class CminusfBuilder : public ASTVisitor {
@@ -59,100 +54,114 @@ class CminusfBuilder : public ASTVisitor {
     CminusfBuilder() {
         module = std::make_unique<Module>();
         builder = std::make_unique<IRBuilder>(nullptr, module.get());
+
         auto *TyVoid = module->get_void_type();
         auto *TyInt32 = module->get_int32_type();
         auto *TyFloat = module->get_float_type();
+        auto *TyInt32Ptr = module->get_int32_ptr_type();
+        auto *TyFloatPtr = module->get_float_ptr_type();
 
-        auto *input_type = FunctionType::get(TyInt32, {});
-        auto *input_fun = Function::create(input_type, "input", module.get());
+        auto *getint_type = FunctionType::get(TyInt32, {});
+        auto *getint_fun =
+            Function::create(getint_type, "getint", module.get());
 
-        std::vector<Type *> output_params;
-        output_params.push_back(TyInt32);
-        auto *output_type = FunctionType::get(TyVoid, output_params);
-        auto *output_fun = Function::create(output_type, "output", module.get());
+        auto *getch_type = FunctionType::get(TyInt32, {});
+        auto *getch_fun = Function::create(getch_type, "getch", module.get());
 
-        std::vector<Type *> output_float_params;
-        output_float_params.push_back(TyFloat);
-        auto *output_float_type = FunctionType::get(TyVoid, output_float_params);
-        auto *output_float_fun =
-            Function::create(output_float_type, "outputFloat", module.get());
+        auto *getfloat_type = FunctionType::get(TyFloat, {});
+        auto *getfloat_fun =
+            Function::create(getfloat_type, "getfloat", module.get());
 
-        auto *neg_idx_except_type = FunctionType::get(TyVoid, {});
-        auto *neg_idx_except_fun = Function::create(
-            neg_idx_except_type, "neg_idx_except", module.get());
+        auto *getarray_type = FunctionType::get(TyInt32, {TyInt32Ptr});
+        auto *getarray_fun =
+            Function::create(getarray_type, "getarray", module.get());
 
-        scope.enter();
-        scope.push("input", input_fun);
-        scope.push("output", output_fun);
-        scope.push("outputFloat", output_float_fun);
-        scope.push("neg_idx_except", neg_idx_except_fun);
+        auto *getfarray_type = FunctionType::get(TyInt32, {TyFloatPtr});
+        auto *getfarray_fun =
+            Function::create(getfarray_type, "getfarray", module.get());
+
+        auto *putint_type = FunctionType::get(TyVoid, {TyInt32});
+        auto *putint_fun =
+            Function::create(putint_type, "putint", module.get());
+
+        auto *putch_type = FunctionType::get(TyVoid, {TyInt32});
+        auto *putch_fun = Function::create(putch_type, "putch", module.get());
+
+        auto *putfloat_type = FunctionType::get(TyVoid, {TyFloat});
+        auto *putfloat_fun =
+            Function::create(putfloat_type, "putfloat", module.get());
+
+        auto *putarray_type = FunctionType::get(TyVoid, {TyInt32, TyInt32Ptr});
+        auto *putarray_fun =
+            Function::create(putarray_type, "putarray", module.get());
+
+        auto *putfarray_type = FunctionType::get(TyVoid, {TyInt32, TyFloatPtr});
+        auto *putfarray_fun =
+            Function::create(putfarray_type, "putfarray", module.get());
+
+        auto *starttime_type = FunctionType::get(TyVoid, {});
+        auto *starttime_fun =
+            Function::create(starttime_type, "starttime", module.get());
+
+        auto *stoptime_type = FunctionType::get(TyVoid, {});
+        auto *stoptime_fun =
+            Function::create(stoptime_type, "stoptime", module.get());
+
+        scope.push("getint", getint_fun);
+        scope.push("getch", getch_fun);
+        scope.push("getfloat", getfloat_fun);
+        scope.push("getarray", getarray_fun);
+        scope.push("getfarray", getfarray_fun);
+        scope.push("putint", putint_fun);
+        scope.push("putch", putch_fun);
+        scope.push("putfloat", putfloat_fun);
+        scope.push("putarray", putarray_fun);
+        scope.push("putfarray", putfarray_fun);
+        scope.push("starttime", starttime_fun);
+        scope.push("stoptime", stoptime_fun);
     }
 
     std::unique_ptr<Module> getModule() { return std::move(module); }
-
+    virtual void store_array(Value *alloca_inst, std::vector<Value *> idxs,
+                             std::vector<ConstantInt *> array_size,
+                             ConstantArray *vals) = 0;
   private:
-    virtual inherite visit(ASTProgram &) override final;
-    virtual inherite visit(ASTCompUnit &) override final;
-    virtual inherite visit(ASTDecl &) override final;
-    virtual inherite visit(ASTStmt &) override final;
-    virtual inherite visit(ASTFuncDef &) override final;
-    virtual inherite visit(ASTConstDecl &) override final;
-    virtual inherite visit(ASTVarDecl &) override final;
-    virtual inherite visit(ASTBtype &) override final;
-    virtual inherite visit(ASTConstDefList &) override final;
-    virtual inherite visit(ASTConstDef &) override final;
-    virtual inherite visit(ASTIdent &) override final;
-    virtual inherite visit(ASTConstExpList &) override final;
-    virtual inherite visit(ASTConstInitVal &) override final;
-    virtual inherite visit(ASTConstExp &) override final;
-    virtual inherite visit(ASTConstInitValList &) override final;
+    virtual Value *visit(ASTProgram &) override final;
+    virtual Value *visit(ASTConstDecl &) override final;
+    virtual Value *visit(ASTConstDef &) override final;
+    virtual Value *visit(ASTConstInitVal &) override final;
+    virtual Value *visit(ASTVarDecl &) override final;
+    virtual Value *visit(ASTVarDef &) override final;
+    virtual Value *visit(ASTInitVal &) override final;
+    virtual Value *visit(ASTFuncDef &) override final;
+    virtual Value *visit(ASTFParam &) override final;
+    virtual Value *visit(ASTBlock &) override final;
+    virtual Value *visit(ASTExpStmt &) override final;
+    virtual Value *visit(ASTAssignStmt &) override final;
+    virtual Value *visit(ASTBlockStmt &) override final;
+    virtual Value *visit(ASTSelectionStmt &) override final;
+    virtual Value *visit(ASTIterationStmt &) override final;
+    virtual Value *visit(ASTReturnStmt &) override final;
+    virtual Value *visit(ASTBreakStmt &) override final;
+    virtual Value *visit(ASTContinueStmt &) override final;
+    virtual Value *visit(ASTLVal &) override final;
+    virtual Value *visit(ASTNumber &) override final;
+    virtual Value *visit(ASTUnaryExp &) override final;
+    virtual Value *visit(ASTBinaryExp &) override final;
+    virtual Value *visit(ASTConstExp &) override final;
+    virtual Value *visit(ASTCond &) override final;
 
-    virtual inherite visit(ASTVarDefList &) override final;
-    virtual inherite visit(ASTVarDef &) override final;
-    virtual inherite visit(ASTExpList &) override final;
-    virtual inherite visit(ASTInitVal &) override final;
-    virtual inherite visit(ASTExp &) override final;
-    virtual inherite visit(ASTInitValList &) override final;
-
-    virtual inherite visit(ASTFuncType &) override final;
-    virtual inherite visit(ASTFuncFParams &) override final;
-    virtual inherite visit(ASTFuncRParams &) override final;
-    virtual inherite visit(ASTBlock &) override final;
-    virtual inherite visit(ASTFuncFParam &) override final;
-    virtual inherite visit(ASTBlockItemList &) override final;
-    virtual inherite visit(ASTBlockItem &) override final;
-
-    virtual inherite visit(ASTLVal &) override final;
-    virtual inherite visit(ASTCond &) override final;
-    
-    
-    virtual inherite visit(ASTAddExp &) override final;
-    virtual inherite visit(ASTLOrExp &) override final;
-
-    virtual inherite visit(ASTLOrExp &) override final;
-    virtual inherite visit(ASTPrimaryExp &) override final;
-    virtual inherite visit(ASTNumber &) override final;
-    virtual inherite visit(ASTIntConst &) override final;
-    virtual inherite visit(ASTFloatConst &) override final;
-    virtual inherite visit(ASTUnaryExp &) override final;
-    virtual inherite visit(ASTUnaryOp &) override final;
-
-    virtual inherite visit(ASTMulExp &) override final;
-    virtual inherite visit(ASTRelExp &) override final;
-    virtual inherite visit(ASTEqExp &) override final;
-    virtual inherite visit(ASTLAndExp &) override final;
-    
     std::unique_ptr<IRBuilder> builder;
     Scope scope;
     std::unique_ptr<Module> module;
 
     struct {
-        int vartype = 0; //when translating, use vartype to record i or f
-
-        
         // function that is being built
         Function *func = nullptr;
         //  you should add more fields to store state
-        bool isLValue = false;
+        bool is_l_value = false;
+        bool is_calc_array_dem = false;
+        bool is_calc_init_val = false;
+        std::vector<ConstantInt *> array_size;
     } context;
 };
