@@ -2,6 +2,7 @@
 #include "Function.hpp"
 #include "GlobalVariable.hpp"
 #include "Instruction.hpp"
+#include "Module.hpp"
 #include "Type.hpp"
 #include "Value.hpp"
 #include "ast.hpp"
@@ -11,6 +12,7 @@
 #include <cassert>
 #include <cstddef>
 #include <memory>
+#include <vector>
 
 #define CONST_FP(num) ConstantFP::get((float)num, module.get())
 #define CONST_INT(num) ConstantInt::get(num, module.get())
@@ -30,28 +32,94 @@ Type *FLOATPTR_T;
  * scope.find: find and return the value bound to the name
  */
 
-void CminusfBuilder::store_array(Value *alloca_inst, std::vector<Value *> idxs,
-                                 std::vector<ConstantInt *> array_size,
-                                 ConstantArray *vals) {
-    if (idxs.size() == array_size.size()) {
-        idxs.insert(idxs.begin(), CONST_INT(0));
-        auto ptr = builder->create_gep(alloca_inst, idxs);
-        Constant *val = vals;
-        for (int i = 0; i < (int)idxs.size(); i++) {
-            auto array_ptr = dynamic_cast<ConstantArray *>(val);
-            assert(array_ptr != nullptr && "Array size not match");
-            val = array_ptr->get_element_value(
-                (dynamic_cast<ConstantInt *>(idxs[i]))->get_value());
-        }
-        builder->create_store(ptr, val);
+void InitValCalc::store_value(Module *module, IRBuilder *builder,
+                              Value *alloca_inst) {
+    if (single_val != nullptr) {
+        if (single_val->get_type()->is_float_type() && type->is_integer_type())
+            assert(false && "trying to initialize integer with float value");
+        else if (single_val->get_type()->is_integer_type() &&
+                 type->is_float_type())
+            single_val = builder->create_sitofp(single_val, type);
+        builder->create_store(alloca_inst, single_val);
         return;
     }
-    for (int i = 0; i < array_size[idxs.size()]->get_value(); i++) {
-        idxs.push_back(CONST_INT(i));
-        store_array(alloca_inst, idxs, array_size, vals);
-        idxs.pop_back();
+    for (int i = 0; i < (int)suffix_product[0]; i++) {
+        if (vals[i]->get_type()->is_float_type() && type->is_integer_type())
+            assert(false &&
+                   "trying to initialize integer array with float value");
+        else if (vals[i]->get_type()->is_integer_type() &&
+                 type->is_float_type())
+            vals[i] = builder->create_sitofp(vals[i], type);
+
+        if (is_const && dynamic_cast<Constant *>(vals[i]) == nullptr)
+            assert(false && "initializer is not a constant");
+        std::vector<Value *> idxs;
+        int idx = i;
+        for (int j = 0; j < (int)array_size.size(); j++) {
+            idxs.push_back(
+                ConstantInt::get(idx / suffix_product[j + 1], module));
+            idx = idx % suffix_product[j + 1];
+        }
+        idxs.push_back(ConstantInt::get(idx, module));
+        auto ptr = builder->create_gep(alloca_inst, idxs);
+        builder->create_store(ptr, vals[i]);
     }
 }
+
+Constant *InitValCalc::get_global_value(Module *module) {
+    if (single_val != nullptr) {
+        auto single_val = dynamic_cast<Constant *>(this->single_val);
+        if (single_val == nullptr)
+            assert(false && "initializer is not a constant");
+
+        if (dynamic_cast<ConstantInt *>(single_val) == nullptr &&
+            type->is_integer_type())
+            assert(false && "trying to initialize integer with float value");
+        else if (dynamic_cast<ConstantFP *>(single_val) == nullptr &&
+                 type->is_float_type())
+            return ConstantFP::get(
+                (float)(dynamic_cast<ConstantInt *>(single_val)->get_value()),
+                module);
+        else
+            return dynamic_cast<Constant *>(single_val);
+    }
+
+    std::vector<Constant *> constant_array;
+    for (int i = 0; i < (int)suffix_product[0]; i++) {
+        auto val = dynamic_cast<Constant *>(vals[i]);
+        if (val == nullptr)
+            assert(false && "initializer is not a constant");
+        if (dynamic_cast<ConstantInt *>(val) == nullptr &&
+            type->is_integer_type())
+            assert(false && "trying to initialize integer with float value");
+        else if (dynamic_cast<ConstantFP *>(val) == nullptr &&
+                 type->is_float_type())
+            return ConstantFP::get(
+                (float)(dynamic_cast<ConstantInt *>(val)->get_value()), module);
+        else
+            constant_array.push_back(val);
+    }
+
+    std::vector<Constant *> new_constant_array;
+    for (int i = (int)array_size.size() - 1; i >= 0; i--) {
+        std::vector<Constant *> sub_constant_array;
+        for (int j = 0; j < constant_array.size(); j++) {
+            sub_constant_array.push_back(constant_array[j]);
+            if ((j + 1) % array_size[i] == 0) {
+                new_constant_array.push_back(ConstantArray::get(
+                    ArrayType::get(sub_constant_array[0]->get_type(),
+                                   array_size[i]),
+                    sub_constant_array));
+                sub_constant_array.clear();
+            }
+        }
+        constant_array = new_constant_array;
+        new_constant_array.clear();
+    }
+    assert(constant_array.size() == 1 && "constant array size error");
+    return constant_array[0];
+}
+
 Value *CminusfBuilder::visit(ASTProgram &node) {
     VOID_T = module->get_void_type();
     INT_T = module->get_int32_type();
@@ -63,6 +131,7 @@ Value *CminusfBuilder::visit(ASTProgram &node) {
     }
     return nullptr;
 }
+
 Value *CminusfBuilder::visit(ASTConstDecl &node) {
     for (auto &def : node.const_defs) {
         def->accept(*this);
@@ -78,37 +147,45 @@ Value *CminusfBuilder::visit(ASTVarDecl &node) {
 }
 
 Value *CminusfBuilder::visit(ASTConstDef &node) {
-    Type *var_type = node.type == TYPE_INT ? INT_T : FLOAT_T;
+    Type *var_type;
 
-    context.is_calc_array_dem = true;
-    context.array_size.clear();
+    if (node.type == TYPE_INT) {
+        var_type = INT_T;
+    } else if (node.type == TYPE_FLOAT) {
+        var_type = FLOAT_T;
+    } else {
+        assert(false && "Unknown type");
+    }
+
+    std::vector<int> array_size;
     for (auto &exp : node.array_size) {
         auto const_ptr = dynamic_cast<ConstantInt *>(exp->accept(*this));
         assert(const_ptr != nullptr && "Array size must be a constant integer");
-        context.array_size.push_back(const_ptr);
+        array_size.push_back(const_ptr->get_value());
         assert(const_ptr->get_value() > 0 && "Array size must be positive");
         var_type = ArrayType::get(var_type, const_ptr->get_value());
     }
-    context.is_calc_array_dem = false;
+
     if (node.init_val != nullptr) {
-        context.is_calc_init_val = true;
-        auto init_val = dynamic_cast<Constant *>(node.init_val->accept(*this));
-        context.is_calc_init_val = false;
+
+        context.init_val_calc = std::make_shared<InitValCalc>(
+            module.get(), builder.get(), array_size,
+            node.type == TYPE_INT ? INT_T : FLOAT_T, true,
+            node.init_val->is_single_exp);
+        node.init_val->accept(*this);
+
         if (scope.in_global()) {
-            scope.push(node.id,
-                       GlobalVariable::create(node.id, module.get(), var_type,
-                                              true, init_val),
-                       true);
+            scope.push(
+                node.id,
+                GlobalVariable::create(
+                    node.id, module.get(), var_type, true,
+                    context.init_val_calc->get_global_value(module.get())),
+                true);
         } else {
             auto alloca_inst = builder->create_alloca(var_type);
             scope.push(node.id, alloca_inst, true);
-            auto init_val_array_ptr = dynamic_cast<ConstantArray *>(init_val);
-            if (context.array_size.size() == 0) {
-                builder->create_store(alloca_inst, init_val);
-            } else {
-                store_array(alloca_inst, {}, context.array_size,
-                            init_val_array_ptr);
-            }
+            context.init_val_calc->store_value(module.get(), builder.get(),
+                                               alloca_inst);
         }
     } else {
         if (scope.in_global()) {
@@ -123,45 +200,213 @@ Value *CminusfBuilder::visit(ASTConstDef &node) {
     }
     return nullptr;
 }
-Value *CminusfBuilder::visit(ASTBtype &node) {
-    Value *nodeS;
-    nodeS.DownType = node.type;
-    return nodeS;
-}
-Value *CminusfBuilder::visit(ASTConstDefList &node) {
-    if (node.type == 1) {
-        (node.Vec[0])->accept(*this);
-    } else {
-        (node.Vec[0])->accept(*this);
-        (node.Vec[1])->accept(*this);
-    }
-}
-Value *CminusfBuilder::visit(ASTConstDef &node) {
-    Type *var_type = nullptr;
-    if (context.vartype == 1) // int
+
+Value *CminusfBuilder::visit(ASTVarDef &node) {
+    Type *var_type;
+
+    if (node.type == TYPE_INT) {
         var_type = INT_T;
-    else if (context.vartype == 2) // float
+    } else if (node.type == TYPE_FLOAT) {
         var_type = FLOAT_T;
-    Value *ConstExpListS = (node.Vec[1])->accept(*this);
-    Value *ConstInitValS = (node.Vec[2])->accept(*this);
-    if (ConstExpListS.is_empty == 1) { // not array
+    } else {
+        assert(false && "Unknown type");
+    }
+
+    std::vector<int> array_size;
+    for (auto &exp : node.array_size) {
+        auto const_ptr = dynamic_cast<ConstantInt *>(exp->accept(*this));
+        assert(const_ptr != nullptr && "Array size must be a constant integer");
+        array_size.push_back(const_ptr->get_value());
+        assert(const_ptr->get_value() > 0 && "Array size must be positive");
+        var_type = ArrayType::get(var_type, const_ptr->get_value());
+    }
+
+    if (node.init_val != nullptr) {
+        context.init_val_calc = std::make_shared<InitValCalc>(
+            module.get(), builder.get(), array_size,
+            node.type == TYPE_INT ? INT_T : FLOAT_T, false,
+            node.init_val->is_single_exp);
+        node.init_val->accept(*this);
+
+        if (scope.in_global()) {
+            scope.push(
+                node.id,
+                GlobalVariable::create(
+                    node.id, module.get(), var_type, false,
+                    context.init_val_calc->get_global_value(module.get())),
+                false);
+        } else {
+            auto alloca_inst = builder->create_alloca(var_type);
+            scope.push(node.id, alloca_inst, false);
+            context.init_val_calc->store_value(module.get(), builder.get(),
+                                               alloca_inst);
+        }
+    } else {
         if (scope.in_global()) {
             scope.push(node.id,
                        GlobalVariable::create(
-                           node.id, module.get(), var_type, true,
-                           ConstInitValS.Data)); // global初始化会自带store
+                           node.id, module.get(), var_type, false,
+                           ConstantZero::get(var_type, module.get())),
+                       false);
         } else {
-            auto ptr = builder->create_alloca(var_type);
-            builder->create_store(ptr, ConstInitValS.Data);
-            scope.push(node.id, ptr);
-        }
-    } else { // array
-        if (scope.in_global()) {
-
-        } else {
+            scope.push(node.id, builder->create_alloca(var_type), false);
         }
     }
+    return nullptr;
 }
+
+Value *CminusfBuilder::visit(ASTConstInitVal &node) {
+    auto &calculator = context.init_val_calc;
+    if (calculator->is_single_val()) {
+        calculator->single_val = node.const_exp->accept(*this);
+        return nullptr;
+    }
+
+    for (auto &init_val : node.init_vals) {
+        if (init_val->is_single_exp) {
+            calculator->vals[calculator->cur_idx] = init_val->accept(*this);
+            calculator->cur_idx++;
+        } else {
+            int next = -1;
+            for (int i = 1; i < (int)calculator->suffix_product.size(); i++) {
+                if (calculator->cur_idx % calculator->suffix_product[i] == 0) {
+                    next = calculator->cur_idx + calculator->suffix_product[i];
+                    break;
+                }
+            }
+            if (next == -1) {
+                assert(false && "array size error");
+            }
+            init_val->accept(*this);
+            calculator->cur_idx = next;
+        }
+    }
+    return nullptr;
+}
+
+Value *CminusfBuilder::visit(ASTInitVal &node) {
+    auto &calculator = context.init_val_calc;
+    if (node.exp != nullptr) {
+        if (calculator->is_single_val()) {
+            calculator->single_val = node.exp->accept(*this);
+            return nullptr;
+        }
+    }
+    for (auto &init_val : node.init_vals) {
+        if (init_val->is_single_exp) {
+            calculator->vals[calculator->cur_idx] = init_val->accept(*this);
+            calculator->cur_idx++;
+        } else {
+            int next = -1;
+            for (int i = 1; i < (int)calculator->suffix_product.size(); i++) {
+                if (calculator->cur_idx % calculator->suffix_product[i] == 0) {
+                    next = calculator->cur_idx + calculator->suffix_product[i];
+                    break;
+                }
+            }
+            if (next == -1) {
+                assert(false && "array size error");
+            }
+            init_val->accept(*this);
+            calculator->cur_idx = next;
+        }
+    }
+    return nullptr;
+}
+
+Value *CminusfBuilder::visit(ASTFuncDef &node) {
+    FunctionType *fun_type;
+    Type *ret_type;
+    std::vector<Type *> param_types;
+    if (node.type == TYPE_INT)
+        ret_type = INT_T;
+    else if (node.type == TYPE_FLOAT)
+        ret_type = FLOAT_T;
+    else
+        ret_type = VOID_T;
+
+    for (auto &param : node.params) {
+        param->accept(*this);
+        param_types.push_back(context.type_return);
+    }
+
+    fun_type = FunctionType::get(ret_type, param_types);
+    auto func = Function::create(fun_type, node.id, module.get());
+    scope.push(node.id, func);
+    context.func = func;
+    auto funcBB = BasicBlock::create(module.get(), "entry", func);
+    builder->set_insert_point(funcBB);
+    scope.enter();
+    std::vector<Value *> args;
+    for (auto &arg : func->get_args()) {
+        args.push_back(&arg);
+    }
+    for (int i = 0; i < node.params.size(); i++) {
+        auto ptr = builder->create_alloca(param_types[i]);
+        builder->create_store(args[i], ptr);
+        scope.push(node.params[i]->id, ptr, false);
+    }
+    context.is_func_block = true;
+    node.block->accept(*this);
+    if (not builder->get_insert_block()->is_terminated()) {
+        if (context.func->get_return_type()->is_void_type())
+            builder->create_void_ret();
+        else if (context.func->get_return_type()->is_float_type())
+            builder->create_ret(CONST_FP(0.));
+        else
+            builder->create_ret(CONST_INT(0));
+    }
+    scope.exit();
+    return nullptr;
+}
+
+Value *CminusfBuilder::visit(ASTBlock &node) {
+    bool is_func_block = context.is_func_block;
+    context.is_func_block = false;
+    if (!is_func_block)
+        scope.enter();
+    for (auto &decl_or_stmt : node.decls_and_stmts) {
+        std::visit([this](auto &&arg) { arg->accept(*this); }, decl_or_stmt);
+        if (builder->get_insert_block()->is_terminated())
+            break;
+    }
+    if (!is_func_block)
+        scope.exit();
+    return nullptr;
+}
+
+Value *CminusfBuilder::visit(ASTFParam &node) {
+    if (node.type == TYPE_VOID) {
+        context.type_return = VOID_T;
+        return nullptr;
+    }
+    Type *var_type;
+    if (node.type == TYPE_INT)
+        var_type = INT_T;
+    else if (node.type == TYPE_FLOAT)
+        var_type = FLOAT_T;
+    else
+        assert(false && "Unknown type");
+
+    for (auto dim = node.array_size.rbegin(); dim != node.array_size.rend();
+         dim++) {
+        auto const_val = static_cast<ConstantInt *>((*dim)->accept(*this));
+        if (const_val == nullptr)
+            assert(false && "Array size must be a constant integer");
+        if (const_val->get_value() <= 0)
+            assert(false && "Array size must be positive");
+
+        var_type = ArrayType::get(var_type, const_val->get_value());
+    }
+
+    if(node.is_array) {
+        var_type = PointerType::get(var_type);
+    }
+    
+    context.type_return = var_type;
+    return nullptr;
+}
+
 Value *CminusfBuilder::visit(ASTIdent &);
 Value *CminusfBuilder::visit(ASTConstExpList &);
 Value *CminusfBuilder::visit(ASTConstInitVal &);
@@ -189,103 +434,6 @@ Value *CminusfBuilder::visit(ASTAddExp &);
 Value *CminusfBuilder::visit(ASTLOrExp &);
 
 Value *CminusfBuilder::visit(ASTLOrExp &);
-Value *CminusfBuilder::visit(ASTPrimaryExp &node) {
-    return (node.Vec[0])->accept(*this);
-}
-Value *CminusfBuilder::visit(ASTNumber &node) {
-    return (node.Vec[0])->accept(*this);
-}
-Value *CminusfBuilder::visit(ASTIntConst &node) {
-    Value *now;
-    now.Data = CONST_INT(node.num);
-    context.RConstI = node.num;
-    return now;
-}
-Value *CminusfBuilder::visit(ASTFloatConst &node) {
-    Value *now;
-    now.Data = CONST_FP(node.num);
-    context.RConstF = node.num;
-    return now;
-}
-Value *CminusfBuilder::visit(ASTUnaryExp &node) {
-    if (node.Type == 3 || node.Type == 2) {
-        std::vector<Value *> args;
-        for (auto &arg : node.args) {
-            args.push_back(arg->accept(*this));
-        }
-        auto func = scope.find(node.id);
-        auto func_type = static_cast<FunctionType *>(func->get_type());
-        for (unsigned int i = 0; i < args.size(); i++) {
-            if (func_type->get_param_type(i)->is_float_type() and
-                not args[i]->get_type()->is_float_type())
-                args[i] = builder->create_sitofp(args[i], FLOAT_T);
-            else if (func_type->get_param_type(i)->is_integer_type()) {
-                if (args[i]->get_type()->is_float_type())
-                    args[i] = builder->create_fptosi(args[i], INT32_T);
-            }
-        }
-        return builder->create_call(func, args);
-    } else if (node.Type == 1)
-        return (node.Vec[0])->accept(*this);
-    else if (node.Type == 4) {
-        if (node.UnaryOp == '+') {
-            return (node.Vec[0])->accept(*this);
-        } else if (node.UnaryOp == '-') {
-            auto qq = (node.Vec[0])->accept(*this);
-            if (qq.Data->get_type()->is_integer_type()) {
-                qq.Data = builder->create_isub(0, qq.Data);
-                context.RConstI *= -1;
-            } else {
-                qq.Data = builder->create_fsub(0, qq.Data);
-                context.RConstF *= -1;
-            }
-            return qq;
-        } else if (node.UnaryOp == '!') {
-            auto qq = (node.Vec[0])->accept(*this);
-            if (qq.Data->get_type()->is_integer_type()) {
-                qq.Data = builder->create_icmp_eq(0, qq.Data);
-                context.RConstI = !(context.RConstI);
-            } else {
-                qq.Data = builder->create_fcmp_eq(0, qq.Data);
-                context.RConstF *= -1;
-            }
-            return qq;
-        }
-    }
-}
-
-Value *CminusfBuilder::visit(ASTMulExp &node) {
-    if (node.Type == 1) {
-        return (node.Vec[0])->accept(*this);
-    } else {
-        auto p1 = (node.Vec[0])->accept(*this);
-        auto p2 = (node.Vec[1])->accept(*this);
-        if ((p1.Data)->get_type()->is_float_type() or
-            (p2.Data)->get_type()->is_float_type()) {
-            if (not(p1.Data)->get_type()->is_float_type())
-                p1.Data = builder->create_sitofp(p1.Data, FLOAT_T);
-            if (not(p2.Data)->get_type()->is_float_type())
-                p2.Data = builder->create_sitofp(p2.Data, FLOAT_T);
-            if (node.op == '*') {
-
-                p1.Data = builder->create_fmul(p1.Data, p2.Data);
-                context.RConstF =
-            } else if (node.op == '/') {
-                return builder->create_fdiv(lhs, rhs);
-            }
-        } else {
-            if (lhs->get_type()->is_int1_type())
-                lhs = builder->create_zext(lhs, INT32_T);
-            if (rhs->get_type()->is_int1_type())
-                rhs = builder->create_zext(rhs, INT32_T);
-            if (node.op == OP_MUL) {
-                return builder->create_imul(lhs, rhs);
-            } else if (node.op == OP_DIV) {
-                return builder->create_isdiv(lhs, rhs);
-            }
-        }
-    }
-}
 Value *CminusfBuilder::visit(ASTRelExp &node) {}
 Value *CminusfBuilder::visit(ASTEqExp &node);
 Value *CminusfBuilder::visit(ASTLAndExp &node);
@@ -297,115 +445,6 @@ Value *CminusfBuilder::visit(ASTNum &node) {
         return CONST_FP(node.f_val);
     else
         LOG(ERROR) << "Unknown type.";
-    return nullptr;
-}
-
-Value *CminusfBuilder::visit(ASTVarDeclaration &node) {
-    if (node.num == nullptr) {
-        if (scope.in_global()) {
-            auto initializer = ConstantZero::get(var_type, module.get());
-            scope.push(node.id,
-                       GlobalVariable::create(node.id, module.get(), var_type,
-                                              false, initializer));
-        } else {
-            scope.push(node.id, builder->create_alloca(var_type));
-        }
-    } else {
-        auto const_val = static_cast<ConstantInt *>(node.num->accept(*this));
-        auto array_type = ArrayType::get(var_type, const_val->get_value());
-        if (scope.in_global()) {
-            auto initializer = ConstantZero::get(var_type, module.get());
-            scope.push(node.id,
-                       GlobalVariable::create(node.id, module.get(), array_type,
-                                              false, initializer));
-        } else {
-            scope.push(node.id, builder->create_alloca(array_type));
-        }
-    }
-
-    return nullptr;
-}
-
-Value *CminusfBuilder::visit(ASTFunDeclaration &node) {
-    FunctionType *fun_type;
-    Type *ret_type;
-    std::vector<Type *> param_types;
-    if (node.type == TYPE_INT)
-        ret_type = INT32_T;
-    else if (node.type == TYPE_FLOAT)
-        ret_type = FLOAT_T;
-    else
-        ret_type = VOID_T;
-
-    for (auto &param : node.params) {
-        // Please accomplish param_types.
-        if (param->type == TYPE_INT) {
-            if (param->isarray)
-                param_types.push_back(INT32PTR_T);
-            else
-                param_types.push_back(INT32_T);
-        } else if (param->type == TYPE_FLOAT) {
-            if (param->isarray)
-                param_types.push_back(FLOATPTR_T);
-            else
-                param_types.push_back(FLOAT_T);
-        } else
-            param_types.push_back(VOID_T);
-    }
-
-    fun_type = FunctionType::get(ret_type, param_types);
-    auto func = Function::create(fun_type, node.id, module.get());
-    scope.push(node.id, func);
-    context.func = func;
-    auto funBB = BasicBlock::create(module.get(), "entry", func);
-    builder->set_insert_point(funBB);
-    scope.enter();
-    std::vector<Value *> args;
-    for (auto &arg : func->get_args()) {
-        args.push_back(&arg);
-    }
-    for (int i = 0; i < node.params.size(); ++i) {
-        // You need to deal with params and store them in the scope.
-        auto ptr = builder->create_alloca(param_types[i]);
-        builder->create_store(args[i], ptr);
-        scope.push(node.params[i]->id, ptr);
-    }
-    node.compound_stmt->accept(*this);
-    if (not builder->get_insert_block()->is_terminated()) {
-        if (context.func->get_return_type()->is_void_type())
-            builder->create_void_ret();
-        else if (context.func->get_return_type()->is_float_type())
-            builder->create_ret(CONST_FP(0.));
-        else
-            builder->create_ret(CONST_INT(0));
-    }
-    scope.exit();
-    return nullptr;
-}
-
-Value *CminusfBuilder::visit(ASTParam &node) {
-    // This function is empty now.
-    // don't know what to do here
-    return nullptr;
-}
-
-Value *CminusfBuilder::visit(ASTCompoundStmt &node) {
-    // to deal with complex statements.
-
-    scope.enter();
-    // FIXME: There will be a bug if the function has a local variable named the
-    // same as a function parameter. but it seems the code doesn't care about
-    // the repeated name.
-    for (auto &decl : node.local_declarations) {
-        decl->accept(*this);
-    }
-
-    for (auto &stmt : node.statement_list) {
-        stmt->accept(*this);
-        if (builder->get_insert_block()->is_terminated())
-            break;
-    }
-    scope.exit();
     return nullptr;
 }
 
@@ -509,9 +548,9 @@ Value *CminusfBuilder::visit(ASTVar &node) {
         if (isLValue)
             return ptr;
         else if (ptr->get_type()->get_pointer_element_type()->is_array_type())
-            // if var is pointer to array, then we need to get the pointer to
-            // the first element of the array as this will only happen when we
-            // are trying to pass an array as a parameter
+            // if var is pointer to array, then we need to get the pointer
+            // to the first element of the array as this will only happen
+            // when we are trying to pass an array as a parameter
             return builder->create_gep(ptr, {CONST_INT(0), CONST_INT(0)});
         else
             return builder->create_load(ptr);
@@ -537,12 +576,13 @@ Value *CminusfBuilder::visit(ASTVar &node) {
         GetElementPtrInst *ptr;
 
         if (var->get_type()->get_pointer_element_type()->is_array_type())
-            // if var is pointer to array, then we need to get the pointer to
-            // the first element of the array
+            // if var is pointer to array, then we need to get the pointer
+            // to the first element of the array
             ptr = builder->create_gep(var, {CONST_INT(0), expression_ret});
         else {
-            // if var is a pointer to pointer(which is the start of an array)
-            // then we need to get the pointer to the first element of the array
+            // if var is a pointer to pointer(which is the start of an
+            // array) then we need to get the pointer to the first element
+            // of the array
             auto ptr_res = builder->create_load(var);
             ptr = builder->create_gep(ptr_res, {expression_ret});
         }

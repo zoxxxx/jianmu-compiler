@@ -49,6 +49,35 @@ class Scope {
     std::vector<std::map<std::string, std::pair<Value *, bool>>> inner;
 };
 
+struct InitValCalc {
+    Type *type;
+    std::vector<int> array_size;
+    std::vector<int> suffix_product;
+    std::vector<Value *> vals;
+    Value *single_val;
+    int cur_idx = 0;
+    bool is_const;
+    bool is_single_exp;
+    InitValCalc(Module *module, IRBuilder *builder, std::vector<int> array_size,
+                Type *type, bool is_const, bool is_single_exp) {
+        suffix_product = array_size;
+        for (int i = (int)array_size.size() - 2; i >= 0; i--) {
+            suffix_product[i] = suffix_product[i] * suffix_product[i + 1];
+        }
+        vals = std::vector<Value *>(suffix_product[0],
+                                    ConstantInt::get(0, module));
+        this->type = type;
+        this->is_const = is_const;
+        this->is_single_exp = is_single_exp;
+        cur_idx = 0;
+        single_val = nullptr;
+    }
+    bool is_single_val() { return is_single_exp; }
+    virtual Constant *get_global_value(Module *module) = 0;
+    virtual void store_value(Module *module, IRBuilder *builder,
+                             Value *alloca_inst) = 0;
+};
+
 class CminusfBuilder : public ASTVisitor {
   public:
     CminusfBuilder() {
@@ -122,9 +151,11 @@ class CminusfBuilder : public ASTVisitor {
     }
 
     std::unique_ptr<Module> getModule() { return std::move(module); }
-    virtual void store_array(Value *alloca_inst, std::vector<Value *> idxs,
-                             std::vector<ConstantInt *> array_size,
-                             ConstantArray *vals) = 0;
+    virtual void store_const_array(Value *alloca_inst,
+                                   std::vector<Value *> idxs,
+                                   std::vector<ConstantInt *> array_size,
+                                   ConstantArray *vals) = 0;
+
   private:
     virtual Value *visit(ASTProgram &) override final;
     virtual Value *visit(ASTConstDecl &) override final;
@@ -160,8 +191,8 @@ class CminusfBuilder : public ASTVisitor {
         Function *func = nullptr;
         //  you should add more fields to store state
         bool is_l_value = false;
-        bool is_calc_array_dem = false;
-        bool is_calc_init_val = false;
-        std::vector<ConstantInt *> array_size;
+        bool is_func_block = false;
+        Type *type_return = nullptr;
+        std::shared_ptr<InitValCalc> init_val_calc;
     } context;
 };
