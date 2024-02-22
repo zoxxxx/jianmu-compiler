@@ -20,6 +20,7 @@ class Instruction : public User, public llvm::ilist_node<Instruction> {
         sub,
         mul,
         sdiv,
+        srem,
         // float binary operators
         fadd,
         fsub,
@@ -86,6 +87,7 @@ class Instruction : public User, public llvm::ilist_node<Instruction> {
     bool is_sub() const { return op_id_ == sub; }
     bool is_mul() const { return op_id_ == mul; }
     bool is_div() const { return op_id_ == sdiv; }
+    bool is_srem() const { return op_id_ == srem; }
 
     bool is_fadd() const { return op_id_ == fadd; }
     bool is_fsub() const { return op_id_ == fsub; }
@@ -103,7 +105,7 @@ class Instruction : public User, public llvm::ilist_node<Instruction> {
 
     bool isBinary() const {
         return (is_add() || is_sub() || is_mul() || is_div() || is_fadd() ||
-                is_fsub() || is_fmul() || is_fdiv()) &&
+                is_srem() || is_fsub() || is_fmul() || is_fdiv()) &&
                (get_num_operand() == 2);
     }
 
@@ -135,6 +137,7 @@ class IBinaryInst : public BaseInst<IBinaryInst> {
     static IBinaryInst *create_sub(Value *v1, Value *v2, BasicBlock *bb);
     static IBinaryInst *create_mul(Value *v1, Value *v2, BasicBlock *bb);
     static IBinaryInst *create_sdiv(Value *v1, Value *v2, BasicBlock *bb);
+    static IBinaryInst *create_srem(Value *v1, Value *v2, BasicBlock *bb);
 
     virtual std::string print() override;
 };

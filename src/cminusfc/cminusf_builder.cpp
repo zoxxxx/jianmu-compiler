@@ -399,14 +399,334 @@ Value *CminusfBuilder::visit(ASTFParam &node) {
         var_type = ArrayType::get(var_type, const_val->get_value());
     }
 
-    if(node.is_array) {
+    if (node.is_array) {
         var_type = PointerType::get(var_type);
     }
-    
+
     context.type_return = var_type;
     return nullptr;
 }
 
+Value *CminusfBuilder::visit(ASTExpStmt &node) {
+    if (!node.is_empty) {
+        node.exp->accept(*this);
+    }
+    return nullptr;
+}
+
+Value *CminusfBuilder::visit(ASTSelectionStmt &node) {
+    auto condBB = BasicBlock::create(module.get(), "", context.func);
+    auto trueBB = BasicBlock::create(module.get(), "", context.func);
+    auto falseBB = BasicBlock::create(module.get(), "", context.func);
+    builder->create_br(condBB);
+    node.cond->accept(*this);
+    context.condBB = condBB;
+    context.trueBB = trueBB;
+    context.falseBB = falseBB;
+    if (node.else_stmt != nullptr) {
+        auto mergeBB = BasicBlock::create(module.get(), "", context.func);
+
+        builder->set_insert_point(trueBB);
+        node.if_stmt->accept(*this);
+        if (not builder->get_insert_block()->is_terminated())
+            builder->create_br(mergeBB);
+
+        builder->set_insert_point(falseBB);
+        node.else_stmt->accept(*this);
+        if (not builder->get_insert_block()->is_terminated())
+            builder->create_br(mergeBB);
+
+        builder->set_insert_point(mergeBB);
+    } else {
+
+        builder->set_insert_point(trueBB);
+        node.if_stmt->accept(*this);
+
+        if (not builder->get_insert_block()->is_terminated())
+            builder->create_br(falseBB);
+
+        builder->set_insert_point(falseBB);
+    }
+    return nullptr;
+}
+
+Value *CminusfBuilder::visit(ASTIterationStmt &node) {
+    auto condBB = BasicBlock::create(module.get(), "", context.func);
+    auto trueBB = BasicBlock::create(module.get(), "", context.func);
+    auto falseBB = BasicBlock::create(module.get(), "", context.func);
+    context.condBB = condBB;
+    context.trueBB = trueBB;
+    context.falseBB = falseBB;
+    context.iteration_endBB = falseBB;
+
+    builder->create_br(condBB);
+
+    node.cond->accept(*this);
+
+    builder->set_insert_point(trueBB);
+    node.stmt->accept(*this);
+
+    if (not builder->get_insert_block()->is_terminated())
+        builder->create_br(condBB);
+
+    builder->set_insert_point(falseBB);
+    return nullptr;
+}
+
+Value *CminusfBuilder::visit(ASTReturnStmt &node) {
+    if (!node.is_empty) {
+        auto exp_ret = node.exp->accept(*this);
+        if (context.func->get_return_type()->is_float_type()) {
+            if (not exp_ret->get_type()->is_float_type())
+                exp_ret = builder->create_sitofp(exp_ret, FLOAT_T);
+        } else if (context.func->get_return_type()->is_integer_type()) {
+            if (exp_ret->get_type()->is_float_type())
+                exp_ret = builder->create_fptosi(exp_ret, INT_T);
+            else if (exp_ret->get_type()->is_int1_type())
+                exp_ret = builder->create_zext(exp_ret, INT_T);
+        }
+        builder->create_ret(exp_ret);
+    } else {
+        builder->create_void_ret();
+    }
+    return nullptr;
+}
+
+Value *CminusfBuilder::visit(ASTBreakStmt &) {
+    builder->create_br(context.iteration_endBB);
+    return nullptr;
+}
+
+Value *CminusfBuilder::visit(ASTContinueStmt &) {
+    builder->create_br(context.condBB);
+    return nullptr;
+}
+
+Value *CminusfBuilder::visit(ASTCond &node) {
+    builder->set_insert_point(context.condBB);
+    if (node.exp->is_binary_exp() &&
+        std::static_pointer_cast<ASTBinaryExp>(node.exp)->is_logic_exp()) {
+        node.exp->accept(*this);
+        return nullptr;
+    }
+    auto exp_ret = node.exp->accept(*this);
+    if (exp_ret->get_type()->is_float_type())
+        exp_ret = builder->create_fcmp_ne(exp_ret, CONST_FP(0.));
+    else if (exp_ret->get_type()->is_int32_type())
+        exp_ret = builder->create_icmp_ne(exp_ret, CONST_INT(0));
+    builder->create_cond_br(exp_ret, context.trueBB, context.falseBB);
+    return nullptr;
+}
+
+Value *CminusfBuilder::visit(ASTBinaryExp &node) {
+    if (node.op == OP_AND) {
+        auto new_trueBB = BasicBlock::create(module.get(), "", context.func);
+        auto old_trueBB = context.trueBB;
+        context.trueBB = new_trueBB;
+
+        auto lhs_ret = node.lhs->accept(*this);
+        if (lhs_ret != nullptr) {
+            if (!lhs_ret->get_type()->is_integer_type()) {
+                assert(false &&
+                       "Not integer type does not support and operation");
+            } else if (lhs_ret->get_type()->is_int32_type())
+                lhs_ret = builder->create_icmp_ne(lhs_ret, CONST_INT(0));
+            builder->create_cond_br(lhs_ret, context.trueBB, context.falseBB);
+        }
+
+        builder->set_insert_point(new_trueBB);
+        context.trueBB = old_trueBB;
+        auto rhs_ret = node.rhs->accept(*this);
+        if (rhs_ret != nullptr) {
+            if (!rhs_ret->get_type()->is_integer_type()) {
+                assert(false &&
+                       "Not integer type does not support and operation");
+            } else if (rhs_ret->get_type()->is_int32_type())
+                rhs_ret = builder->create_icmp_ne(rhs_ret, CONST_INT(0));
+            builder->create_cond_br(rhs_ret, context.trueBB, context.falseBB);
+        }
+        return nullptr;
+    }
+    if (node.op == OP_OR) {
+        auto new_falseBB = BasicBlock::create(module.get(), "", context.func);
+        auto old_falseBB = context.falseBB;
+        context.falseBB = new_falseBB;
+
+        auto lhs_ret = node.lhs->accept(*this);
+        if (lhs_ret != nullptr) {
+            if (!lhs_ret->get_type()->is_integer_type()) {
+                assert(false &&
+                       "Not integer type does not support or operation");
+            } else if (lhs_ret->get_type()->is_int32_type())
+                lhs_ret = builder->create_icmp_ne(lhs_ret, CONST_INT(0));
+            builder->create_cond_br(lhs_ret, context.trueBB, context.falseBB);
+        }
+
+        builder->set_insert_point(new_falseBB);
+        context.falseBB = old_falseBB;
+        auto rhs_ret = node.rhs->accept(*this);
+        if (rhs_ret != nullptr) {
+            if (!rhs_ret->get_type()->is_integer_type()) {
+                assert(false &&
+                       "Not integer type does not support or operation");
+            } else if (rhs_ret->get_type()->is_int32_type())
+                rhs_ret = builder->create_icmp_ne(rhs_ret, CONST_INT(0));
+            builder->create_cond_br(rhs_ret, context.trueBB, context.falseBB);
+        }
+        return nullptr;
+    }
+    auto lhs = node.lhs->accept(*this);
+    auto rhs = node.rhs->accept(*this);
+
+    if (dynamic_cast<Constant *>(lhs) == nullptr and
+        dynamic_cast<Constant *>(rhs) == nullptr) {
+        if (dynamic_cast<ConstantFP *>(lhs) != nullptr or
+            dynamic_cast<ConstantFP *>(rhs) != nullptr) {
+            float lhs_val, rhs_val;
+            if (dynamic_cast<ConstantFP *>(lhs) != nullptr)
+                lhs_val = dynamic_cast<ConstantFP *>(lhs)->get_value();
+            else if (dynamic_cast<ConstantInt *>(lhs) != nullptr)
+                lhs_val = dynamic_cast<ConstantInt *>(lhs)->get_value();
+            else
+                assert(false && "Unknown type");
+            if (dynamic_cast<ConstantFP *>(rhs) != nullptr)
+                rhs_val = dynamic_cast<ConstantFP *>(rhs)->get_value();
+            else if (dynamic_cast<ConstantInt *>(rhs) != nullptr)
+                rhs_val = dynamic_cast<ConstantInt *>(rhs)->get_value();
+            else
+                assert(false && "Unknown type");
+            switch (node.op) {
+            case OP_PLUS:
+                return CONST_FP(lhs_val + rhs_val);
+            case OP_MINUS:
+                return CONST_FP(lhs_val - rhs_val);
+            case OP_MUL:
+                return CONST_FP(lhs_val * rhs_val);
+            case OP_DIV:
+                return CONST_FP(lhs_val / rhs_val);
+            case OP_MOD:
+                assert(false && "Float type does not support mod operation");
+                return nullptr;
+            case OP_LT:
+                return CONST_INT(lhs_val < rhs_val);
+            case OP_LE:
+                return CONST_INT(lhs_val <= rhs_val);
+            case OP_GT:
+                return CONST_INT(lhs_val > rhs_val);
+            case OP_GE:
+                return CONST_INT(lhs_val >= rhs_val);
+            case OP_EQ:
+                return CONST_INT(lhs_val == rhs_val);
+            case OP_NEQ:
+                return CONST_INT(lhs_val != rhs_val);
+            default:
+                assert(false && "Unknown operator");
+            }
+        } else {
+            int lhs_val, rhs_val;
+            if (dynamic_cast<ConstantInt *>(lhs) != nullptr)
+                lhs_val = dynamic_cast<ConstantInt *>(lhs)->get_value();
+            else
+                assert(false && "Unknown type");
+            if (dynamic_cast<ConstantInt *>(rhs) != nullptr)
+                rhs_val = dynamic_cast<ConstantInt *>(rhs)->get_value();
+            else
+                assert(false && "Unknown type");
+            switch (node.op) {
+            case OP_PLUS:
+                return CONST_INT(lhs_val + rhs_val);
+            case OP_MINUS:
+                return CONST_INT(lhs_val - rhs_val);
+            case OP_MUL:
+                return CONST_INT(lhs_val * rhs_val);
+            case OP_DIV:
+                return CONST_INT(lhs_val / rhs_val);
+            case OP_MOD:
+                return CONST_INT(lhs_val % rhs_val);
+            case OP_LT:
+                return CONST_INT(lhs_val < rhs_val);
+            case OP_LE:
+                return CONST_INT(lhs_val <= rhs_val);
+            case OP_GT:
+                return CONST_INT(lhs_val > rhs_val);
+            case OP_GE:
+                return CONST_INT(lhs_val >= rhs_val);
+            case OP_EQ:
+                return CONST_INT(lhs_val == rhs_val);
+            case OP_NEQ:
+                return CONST_INT(lhs_val != rhs_val);
+            default:
+                assert(false && "Unknown operator");
+            }
+        }
+    } else if (lhs->get_type()->is_float_type() or
+               rhs->get_type()->is_float_type()) {
+        if (not lhs->get_type()->is_float_type())
+            lhs = builder->create_sitofp(lhs, FLOAT_T);
+        if (not rhs->get_type()->is_float_type())
+            rhs = builder->create_sitofp(rhs, FLOAT_T);
+        switch (node.op) {
+        case OP_PLUS:
+            return builder->create_fadd(lhs, rhs);
+        case OP_MINUS:
+            return builder->create_fsub(lhs, rhs);
+        case OP_MUL:
+            return builder->create_fmul(lhs, rhs);
+        case OP_DIV:
+            return builder->create_fdiv(lhs, rhs);
+        case OP_MOD:
+            assert(false && "Float type does not support mod operation");
+            return nullptr;
+        case OP_LT:
+            return builder->create_fcmp_lt(lhs, rhs);
+        case OP_LE:
+            return builder->create_fcmp_le(lhs, rhs);
+        case OP_GT:
+            return builder->create_fcmp_gt(lhs, rhs);
+        case OP_GE:
+            return builder->create_fcmp_ge(lhs, rhs);
+        case OP_EQ:
+            return builder->create_fcmp_eq(lhs, rhs);
+        case OP_NEQ:
+            return builder->create_fcmp_ne(lhs, rhs);
+        default:
+            assert(false && "Unknown operator");
+        }
+    } else {
+        if (lhs->get_type()->is_int1_type())
+            lhs = builder->create_zext(lhs, INT_T);
+        if (rhs->get_type()->is_int1_type())
+            rhs = builder->create_zext(rhs, INT_T);
+        switch (node.op) {
+        case OP_PLUS:
+            return builder->create_iadd(lhs, rhs);
+        case OP_MINUS:
+            return builder->create_isub(lhs, rhs);
+        case OP_MUL:
+            return builder->create_imul(lhs, rhs);
+        case OP_DIV:
+            return builder->create_isdiv(lhs, rhs);
+        case OP_MOD:
+            return builder->create_isrem(lhs, rhs);
+        case OP_LT:
+            return builder->create_icmp_lt(lhs, rhs);
+        case OP_LE:
+            return builder->create_icmp_le(lhs, rhs);
+        case OP_GT:
+            return builder->create_icmp_gt(lhs, rhs);
+        case OP_GE:
+            return builder->create_icmp_ge(lhs, rhs);
+        case OP_EQ:
+            return builder->create_icmp_eq(lhs, rhs);
+        case OP_NEQ:
+            return builder->create_icmp_ne(lhs, rhs);
+        default:
+            assert(false && "Unknown operator");
+        }
+    }
+    assert(false && "Unknown operator");
+    return nullptr;
+}
 Value *CminusfBuilder::visit(ASTIdent &);
 Value *CminusfBuilder::visit(ASTConstExpList &);
 Value *CminusfBuilder::visit(ASTConstInitVal &);
@@ -432,11 +752,6 @@ Value *CminusfBuilder::visit(ASTCond &);
 
 Value *CminusfBuilder::visit(ASTAddExp &);
 Value *CminusfBuilder::visit(ASTLOrExp &);
-
-Value *CminusfBuilder::visit(ASTLOrExp &);
-Value *CminusfBuilder::visit(ASTRelExp &node) {}
-Value *CminusfBuilder::visit(ASTEqExp &node);
-Value *CminusfBuilder::visit(ASTLAndExp &node);
 
 Value *CminusfBuilder::visit(ASTNum &node) {
     if (node.type == TYPE_INT)

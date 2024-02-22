@@ -194,5 +194,9 @@ class CminusfBuilder : public ASTVisitor {
         bool is_func_block = false;
         Type *type_return = nullptr;
         std::shared_ptr<InitValCalc> init_val_calc;
+        BasicBlock *trueBB = nullptr;
+        BasicBlock *falseBB = nullptr;
+        BasicBlock *condBB = nullptr;
+        BasicBlock *iteration_endBB = nullptr;
     } context;
 };
