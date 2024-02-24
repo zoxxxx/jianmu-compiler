@@ -27,7 +27,7 @@ class Scope {
     // return true if successful
     // return false if this name already exits
     bool push(const std::string &name, Value *val, bool is_const_decl = false) {
-        auto result = inner[inner.size() - 1].insert(
+        auto result = inner[(int)inner.size() - 1].insert(
             {name, std::make_pair(val, is_const_decl)});
         return result.second;
     }
@@ -60,12 +60,14 @@ struct InitValCalc {
     bool is_single_exp;
     InitValCalc(Module *module, IRBuilder *builder, std::vector<int> array_size,
                 Type *type, bool is_const, bool is_single_exp) {
+        this->array_size = array_size;
         suffix_product = array_size;
         for (int i = (int)array_size.size() - 2; i >= 0; i--) {
             suffix_product[i] = suffix_product[i] * suffix_product[i + 1];
         }
-        vals = std::vector<Value *>(suffix_product[0],
-                                    ConstantInt::get(0, module));
+        if (suffix_product.size() != 0)
+            vals = std::vector<Value *>(suffix_product[0],
+                                        ConstantInt::get(0, module));
         this->type = type;
         this->is_const = is_const;
         this->is_single_exp = is_single_exp;
@@ -73,9 +75,8 @@ struct InitValCalc {
         single_val = nullptr;
     }
     bool is_single_val() { return is_single_exp; }
-    Constant *get_global_value(Module *module);
-    void store_value(Module *module, IRBuilder *builder,
-                             Value *alloca_inst);
+    Constant *get_const_value(Module *module);
+    void store_value(Module *module, IRBuilder *builder, Value *alloca_inst);
 };
 
 class CminusfBuilder : public ASTVisitor {
@@ -136,6 +137,7 @@ class CminusfBuilder : public ASTVisitor {
         auto *stoptime_fun =
             Function::create(stoptime_type, "stoptime", module.get());
 
+        scope.enter();
         scope.push("getint", getint_fun);
         scope.push("getch", getch_fun);
         scope.push("getfloat", getfloat_fun);
@@ -148,6 +150,8 @@ class CminusfBuilder : public ASTVisitor {
         scope.push("putfarray", putfarray_fun);
         scope.push("starttime", starttime_fun);
         scope.push("stoptime", stoptime_fun);
+
+        const_scope.enter();
     }
 
     std::unique_ptr<Module> getModule() { return std::move(module); }
@@ -180,6 +184,7 @@ class CminusfBuilder : public ASTVisitor {
 
     std::unique_ptr<IRBuilder> builder;
     Scope scope;
+    Scope const_scope;
     std::unique_ptr<Module> module;
 
     struct {

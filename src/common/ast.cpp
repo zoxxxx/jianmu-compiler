@@ -279,7 +279,7 @@ std::shared_ptr<ASTNode> AST::transform_node_iter(syntax_tree_node *n) {
             }
             while (!s.empty()) {
                 auto child_node =
-                    std::static_pointer_cast<ASTConstExp>(transform_node_iter(s.top()));
+                    std::static_pointer_cast<ASTExp>(transform_node_iter(s.top()));
                 node->array_size.push_back(child_node);
                 s.pop();
             }
@@ -371,6 +371,16 @@ std::shared_ptr<ASTNode> AST::transform_node_iter(syntax_tree_node *n) {
             auto node = std::make_shared<ASTContinueStmt>();
             return node;
         }
+        else if(_STR_EQ(n->children[0]->name, ";")) {
+            auto node = std::make_shared<ASTExpStmt>();
+            node->exp = nullptr;
+            node->is_empty = true;
+            return node;
+        }
+        else {
+            std::cerr << "Unknown type of statement" << std::endl;
+            std::abort();
+        }
     }
     else if (_STR_EQ(n->name, "Exp")) {
         return transform_node_iter(n->children[0]);
@@ -424,13 +434,13 @@ std::shared_ptr<ASTNode> AST::transform_node_iter(syntax_tree_node *n) {
         }
         else if(n->children_num == 2) {
             node->has_unary_op = true;
-            if(_STR_EQ(n->children[0]->name, "+")) {
+            if(_STR_EQ(n->children[0]->children[0]->name, "+")) {
                 node->op = OP_POS;
             }
-            else if(_STR_EQ(n->children[0]->name, "-")) {
+            else if(_STR_EQ(n->children[0]->children[0]->name, "-")) {
                 node->op = OP_NEG;
             }
-            else if(_STR_EQ(n->children[0]->name, "!")) {
+            else if(_STR_EQ(n->children[0]->children[0]->name, "!")) {
                 node->op = OP_NOT;
             }
             node->exp = std::static_pointer_cast<ASTUnaryExp>(transform_node_iter(n->children[1]));

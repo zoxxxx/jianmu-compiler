@@ -163,7 +163,6 @@ struct ASTConstDef : ASTNode {
     std::vector<std::shared_ptr<ASTConstExp>> array_size;
     // actually if it is an array, the vector should have size larger than 0
     std::shared_ptr<ASTConstInitVal> init_val;
-    ConstStruct* const_struct = nullptr;
 };
 
 struct ASTConstInitVal : ASTNode {
@@ -219,7 +218,7 @@ struct ASTFParam : ASTNode {
     SysyType type;
     std::string id;
     bool is_array;
-    std::vector<std::shared_ptr<ASTConstExp>> array_size;
+    std::vector<std::shared_ptr<ASTExp>> array_size;
     // attention that the first dimension of array is not included in the array size
 };
 

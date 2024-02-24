@@ -1,10 +1,10 @@
 build/
 .cache/
 .VSCodeCounter/
-.vscode/
 .clang-format
 tests/functional
 tests/performance
 tests/hidden_functional
 tests/final_performance
 tests/output
+output/

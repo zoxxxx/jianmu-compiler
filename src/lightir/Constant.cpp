@@ -57,8 +57,8 @@ std::string ConstantInt::print() {
 
 ConstantArray::ConstantArray(ArrayType *ty, const std::vector<Constant *> &val)
     : Constant(ty, "") {
-    for (unsigned i = 0; i < val.size(); i++)
-        set_operand(i, val[i]);
+    // for (unsigned i = 0; i < val.size(); i++)
+    //     set_operand(i, val[i]);
     this->const_array.assign(val.begin(), val.end());
 }
 
@@ -73,7 +73,7 @@ ConstantArray *ConstantArray::get(ArrayType *ty,
 
 std::string ConstantArray::print() {
     std::string const_ir;
-    const_ir += this->get_type()->print();
+    // const_ir += this->get_type()->print();
     const_ir += " ";
     const_ir += "[";
     for (unsigned i = 0; i < this->get_size_of_array(); i++) {
@@ -81,8 +81,9 @@ std::string ConstantArray::print() {
         if (!dynamic_cast<ConstantArray *>(get_element_value(i))) {
             const_ir += element->get_type()->print();
         }
+        const_ir += " ";
         const_ir += element->print();
-        if (i < this->get_size_of_array()) {
+        if (i + 1< this->get_size_of_array()) {
             const_ir += ", ";
         }
     }
