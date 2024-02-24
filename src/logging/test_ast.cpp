@@ -1,5 +1,4 @@
 #include "ast.hpp"
-#include "get_constnum.hpp"
 
 #include <iostream>
 
@@ -9,7 +8,7 @@ int main(int argc, char **argv) {
     } else {
         auto s = parse(argv[1]);
         auto a = AST(s);
-        auto printer = GetConst();
+        auto printer = ASTPrinter(); 
         a.run_visitor(printer);
     }
     return 0;

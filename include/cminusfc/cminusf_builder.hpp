@@ -73,9 +73,9 @@ struct InitValCalc {
         single_val = nullptr;
     }
     bool is_single_val() { return is_single_exp; }
-    virtual Constant *get_global_value(Module *module) = 0;
-    virtual void store_value(Module *module, IRBuilder *builder,
-                             Value *alloca_inst) = 0;
+    Constant *get_global_value(Module *module);
+    void store_value(Module *module, IRBuilder *builder,
+                             Value *alloca_inst);
 };
 
 class CminusfBuilder : public ASTVisitor {
@@ -151,10 +151,6 @@ class CminusfBuilder : public ASTVisitor {
     }
 
     std::unique_ptr<Module> getModule() { return std::move(module); }
-    virtual void store_const_array(Value *alloca_inst,
-                                   std::vector<Value *> idxs,
-                                   std::vector<ConstantInt *> array_size,
-                                   ConstantArray *vals) = 0;
 
   private:
     virtual Value *visit(ASTProgram &) override final;
@@ -192,6 +188,7 @@ class CminusfBuilder : public ASTVisitor {
         //  you should add more fields to store state
         bool is_l_value = false;
         bool is_func_block = false;
+        bool is_const_exp = false;
         Type *type_return = nullptr;
         std::shared_ptr<InitValCalc> init_val_calc;
         BasicBlock *trueBB = nullptr;

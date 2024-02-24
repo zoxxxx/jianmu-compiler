@@ -340,7 +340,6 @@ struct ASTExp : ASTNode {
 };
 
 struct ASTUnaryExp : ASTExp {
-    // 写一个构造函数
     virtual Value *accept(ASTVisitor &) override final;
     virtual ConstStruct *accept(ASTVisitor2 &) override final;
     virtual ~ASTUnaryExp() = default;
@@ -388,7 +387,6 @@ struct ASTConstExp : ASTNode {
     virtual ConstStruct *accept(ASTVisitor2 &) override final;
     virtual ~ASTConstExp() = default;
     SysyType type;
-    std::variant<int, float> value;
     std::shared_ptr<ASTExp> exp;
 };
 
