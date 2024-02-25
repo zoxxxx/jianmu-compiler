@@ -1,5 +1,5 @@
 #!/bin/bash
-
+ulimit -s 1024000000
 project_dir=$(realpath ../)
 sylib_dir=$(realpath "$project_dir"/src/sylib)
 output_dir=output

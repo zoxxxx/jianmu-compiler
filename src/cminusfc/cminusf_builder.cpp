@@ -37,7 +37,7 @@ void InitValCalc::store_value(Module *module, IRBuilder *builder,
                               Value *alloca_inst) {
     if (single_val != nullptr) {
         if (single_val->get_type()->is_float_type() && type->is_integer_type())
-            assert(false && "trying to initialize integer with float value");
+            single_val = builder->create_fptosi(single_val, type);
         else if (single_val->get_type()->is_integer_type() &&
                  type->is_float_type())
             single_val = builder->create_sitofp(single_val, type);
@@ -73,8 +73,11 @@ Constant *InitValCalc::get_const_value(Module *module) {
             assert(false && "initializer is not a constant");
 
         if (dynamic_cast<ConstantInt *>(single_val) == nullptr &&
-            type->is_integer_type())
-            assert(false && "trying to initialize integer with float value");
+            type->is_integer_type()) {
+            return ConstantInt::get(
+                (int)(dynamic_cast<ConstantFP *>(single_val)->get_value()),
+                module);
+            }
         else if (dynamic_cast<ConstantFP *>(single_val) == nullptr &&
                  type->is_float_type())
             return ConstantFP::get(
@@ -392,7 +395,9 @@ Value *CminusfBuilder::visit(ASTFParam &node) {
 
     for (auto dim = node.array_size.rbegin(); dim != node.array_size.rend();
          dim++) {
+        context.is_const_exp = true;
         auto const_val = static_cast<ConstantInt *>((*dim)->accept(*this));
+        context.is_const_exp = false;
         if (const_val == nullptr)
             assert(false && "Array size must be a constant integer");
         if (const_val->get_value() <= 0)
@@ -653,9 +658,8 @@ Value *CminusfBuilder::visit(ASTBinaryExp &node) {
 
         auto lhs_ret = node.lhs->accept(*this);
         if (lhs_ret != nullptr) {
-            if (!lhs_ret->get_type()->is_integer_type()) {
-                assert(false &&
-                       "Not integer type does not support and operation");
+            if (lhs_ret->get_type()->is_float_type()) {
+                lhs_ret = builder->create_fcmp_ne(lhs_ret, CONST_FP(0.));
             } else if (lhs_ret->get_type()->is_int32_type())
                 lhs_ret = builder->create_icmp_ne(lhs_ret, CONST_INT(0));
             builder->create_cond_br(lhs_ret, context.trueBB, context.falseBB);
@@ -665,9 +669,8 @@ Value *CminusfBuilder::visit(ASTBinaryExp &node) {
         context.trueBB = old_trueBB;
         auto rhs_ret = node.rhs->accept(*this);
         if (rhs_ret != nullptr) {
-            if (!rhs_ret->get_type()->is_integer_type()) {
-                assert(false &&
-                       "Not integer type does not support and operation");
+            if (rhs_ret->get_type()->is_float_type()) {
+                rhs_ret = builder->create_fcmp_ne(rhs_ret, CONST_FP(0.));
             } else if (rhs_ret->get_type()->is_int32_type())
                 rhs_ret = builder->create_icmp_ne(rhs_ret, CONST_INT(0));
             builder->create_cond_br(rhs_ret, context.trueBB, context.falseBB);
@@ -681,9 +684,8 @@ Value *CminusfBuilder::visit(ASTBinaryExp &node) {
 
         auto lhs_ret = node.lhs->accept(*this);
         if (lhs_ret != nullptr) {
-            if (!lhs_ret->get_type()->is_integer_type()) {
-                assert(false &&
-                       "Not integer type does not support or operation");
+            if(lhs_ret->get_type()->is_float_type()) {
+                lhs_ret = builder->create_fcmp_ne(lhs_ret, CONST_FP(0.));
             } else if (lhs_ret->get_type()->is_int32_type())
                 lhs_ret = builder->create_icmp_ne(lhs_ret, CONST_INT(0));
             builder->create_cond_br(lhs_ret, context.trueBB, context.falseBB);
@@ -693,9 +695,8 @@ Value *CminusfBuilder::visit(ASTBinaryExp &node) {
         context.falseBB = old_falseBB;
         auto rhs_ret = node.rhs->accept(*this);
         if (rhs_ret != nullptr) {
-            if (!rhs_ret->get_type()->is_integer_type()) {
-                assert(false &&
-                       "Not integer type does not support or operation");
+            if(rhs_ret->get_type()->is_float_type()) {
+                rhs_ret = builder->create_fcmp_ne(rhs_ret, CONST_FP(0.));
             } else if (rhs_ret->get_type()->is_int32_type())
                 rhs_ret = builder->create_icmp_ne(rhs_ret, CONST_INT(0));
             builder->create_cond_br(rhs_ret, context.trueBB, context.falseBB);
@@ -830,8 +831,6 @@ Value *CminusfBuilder::visit(ASTBinaryExp &node) {
             lhs = builder->create_zext(lhs, INT_T);
         if (rhs->get_type()->is_int1_type())
             rhs = builder->create_zext(rhs, INT_T);
-        std::cerr<<lhs->get_type()->is_pointer_type()<<std::endl;
-        std::cerr<<rhs->get_type()->is_pointer_type()<<std::endl;
         switch (node.op) {
         case OP_PLUS:
             return builder->create_iadd(lhs, rhs);
@@ -901,7 +900,7 @@ Value *CminusfBuilder::visit(ASTUnaryExp &node) {
                 case OP_POS:
                     return exp_ret;
                 case OP_NEG:
-                    return builder->create_fsub(CONST_INT(0), exp_ret);
+                    return builder->create_fsub(CONST_FP(0.), exp_ret);
                 case OP_NOT:
                     exp_ret = builder->create_fcmp_eq(exp_ret, CONST_FP(0.));
                 default:

@@ -78,9 +78,7 @@ std::string ConstantArray::print() {
     const_ir += "[";
     for (unsigned i = 0; i < this->get_size_of_array(); i++) {
         Constant *element = get_element_value(i);
-        if (!dynamic_cast<ConstantArray *>(get_element_value(i))) {
-            const_ir += element->get_type()->print();
-        }
+        const_ir += element->get_type()->print();
         const_ir += " ";
         const_ir += element->print();
         if (i + 1< this->get_size_of_array()) {
