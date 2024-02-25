@@ -1,10 +1,10 @@
 #!/bin/bash
-ulimit -s 1024000000
+ulimit -s 4096000
+timeout=120
 project_dir=$(realpath ../)
 sylib_dir=$(realpath "$project_dir"/src/sylib)
 output_dir=output
 suffix=sy
-timeout=10
 
 LOG=log.txt
 
@@ -27,6 +27,18 @@ check_return_value() {
 	else
 		printf "\033[1;31m%s: \033[0m%s\n" "$fail_msg" "$detail"
 		return 1
+	fi
+}
+
+check_compile_time() {
+	rv=$1
+	fail_msg=$2
+	detail=$3
+	if [ $1 -eq 124 ]; then
+		printf "\033[1;31m%s: \033[0m%s\n" "$fail_msg" "$detail"
+		return 1
+	else
+		return 0
 	fi
 }
 
@@ -82,12 +94,14 @@ for case in $testcases; do
 	# if debug or ll mode on, generate .ll also
 	if [ $debug_mode = true ] || [ $ll_mode = true ]; then
 		timeout $timeout bash -c "cminusfc -emit-llvm $case -o $ll_file" >>$LOG 2>&1
+		check_compile_time $? "TLE" "cminusfc compiler error" || continue
 	fi
 
 	# Skip asm and executable generation if in ll mode
 	if [ $ll_mode = false ]; then
 		# cminusfc compile to .s
 		timeout $timeout bash -c "cminusfc -S $case -o $asm_file" >>$LOG 2>&1
+		check_compile_time $? "TLE" "cminusfc compiler error" || continue
 		check_return_value $? 0 "CE" "cminusfc compiler error" || continue
 
 		# gcc compile asm to executable
@@ -104,9 +118,12 @@ for case in $testcases; do
 		fi
 	else
 		# For ll mode, use llc and clang to compile and run .ll file
-		llc "$ll_file" -filetype=obj -o "$output_dir/$case_base_name.o" >>$LOG 2>&1
+		timeout $timeout llc "$ll_file" -filetype=obj -o "$output_dir/$case_base_name.o" >>$LOG 2>&1
+		check_compile_time $? "TLE" "llc compiler error" || continue
 		check_return_value $? 0 "CE" "llc compiler error" || continue
-		clang "$output_dir/$case_base_name.o" -o "$exe_file" -lsylib>>$LOG 2>&1
+
+		timeout $timeout clang "$output_dir/$case_base_name.o" -o "$exe_file" -lsylib>>$LOG 2>&1
+		check_compile_time $? "TLE" "clang linker error" || continue
 		check_return_value $? 0 "CE" "clang linker error" || continue
 
 		# Run the compiled executable
@@ -117,21 +134,9 @@ for case in $testcases; do
 		fi
 	fi
 
-	if [ $? -eq 124 ]; then
-		echo "Compilation Time Limit Exceeded (TLE)" >> $LOG
-		printf "\033[1;31mCompilation TLE\033[0m\n"
-		continue
-	fi
-
 	timeout $timeout bash -c "$exec_cmd"
 	ret=$?
-
-	if [ $ret -eq 124 ]; then
-		echo "TLE" >> "$out_file"
-		printf "\033[1;31mTLE\033[0m\n"
-		continue
-	fi
-
+	check_compile_time $ret "TLE" "execution error" || continue
 	# remove trailing null byte in the end line
 	sed -i "\$s/\x00*$//" "$out_file"
 	# append return value
@@ -142,10 +147,7 @@ for case in $testcases; do
 			echo "" >> "$out_file"  
 		fi
 	fi
-
-
-
-
+	
 	echo $ret >>"$out_file"
 
 	# compare output

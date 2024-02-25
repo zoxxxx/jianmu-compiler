@@ -69,7 +69,6 @@ int main(int argc, char **argv) {
         codegen.run();
         output_stream << codegen.print();
     }
-
     return 0;
 }
 

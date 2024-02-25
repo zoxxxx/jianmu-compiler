@@ -58,7 +58,7 @@ std::string ConstantInt::print() {
 ConstantArray::ConstantArray(ArrayType *ty, const std::vector<Constant *> &val)
     : Constant(ty, "") {
     // for (unsigned i = 0; i < val.size(); i++)
-    //     set_operand(i, val[i]);
+    //     add_operand(val[i]);
     this->const_array.assign(val.begin(), val.end());
 }
 

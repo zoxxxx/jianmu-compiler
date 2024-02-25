@@ -4,6 +4,7 @@
 #include <iostream>
 #include <list>
 #include <string>
+#include <set>
 
 class Type;
 class Value;
@@ -18,7 +19,7 @@ class Value {
 
     std::string get_name() const { return name_; };
     Type *get_type() const { return type_; }
-    const std::list<Use> &get_use_list() const { return use_list_; }
+    const std::multiset<Use> &get_use_list() const { return use_list_; }
 
     bool set_name(std::string name);
 
@@ -32,6 +33,6 @@ class Value {
 
   private:
     Type *type_;
-    std::list<Use> use_list_; // who use this value
+    std::multiset<Use> use_list_; // who use this value
     std::string name_;        // should we put name field here ?
 };

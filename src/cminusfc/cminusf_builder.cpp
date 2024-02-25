@@ -473,10 +473,12 @@ Value *CminusfBuilder::visit(ASTIterationStmt &node) {
     auto old_trueBB = context.trueBB;
     auto old_falseBB = context.falseBB;
     auto old_iteration_endBB = context.iteration_endBB;
+    auto old_iteration_condBB = context.iteration_condBB;
     context.condBB = condBB;
     context.trueBB = trueBB;
     context.falseBB = falseBB;
     context.iteration_endBB = falseBB;
+    context.iteration_condBB = condBB;
 
     builder->create_br(condBB);
 
@@ -493,6 +495,7 @@ Value *CminusfBuilder::visit(ASTIterationStmt &node) {
     context.trueBB = old_trueBB;
     context.falseBB = old_falseBB;
     context.iteration_endBB = old_iteration_endBB;
+    context.iteration_condBB = old_iteration_condBB;
     return nullptr;
 }
 
@@ -521,7 +524,7 @@ Value *CminusfBuilder::visit(ASTBreakStmt &node) {
 }
 
 Value *CminusfBuilder::visit(ASTContinueStmt &node) {
-    builder->create_br(context.condBB);
+    builder->create_br(context.iteration_condBB);
     return nullptr;
 }
 
@@ -566,6 +569,7 @@ Value *CminusfBuilder::visit(ASTCond &node) {
 }
 
 Value *CminusfBuilder::visit(ASTLVal &node) {
+    std::cerr<<node.id<<std::endl;
     auto [ptr, is_const] = scope.find(node.id);
     if (context.is_const_exp and not is_const)
         assert(false && "The expression is not constant");
@@ -625,6 +629,7 @@ Value *CminusfBuilder::visit(ASTLVal &node) {
         }
         return const_ptr;
     }
+    std::cerr<<dim<<' '<<node.array_exp.size()<<std::endl;
     Value *pos_ptr;
     if (ptr->get_type()->get_pointer_element_type()->is_array_type()) {
         array_exp.insert(array_exp.begin(), CONST_INT(0));

@@ -9,7 +9,7 @@
             "request": "launch",
             "name": "Debug",
             "program": "cminusfc",
-            "args": ["/home/zox/compiler/2023ustc-jianmu-compiler/tests/hidden_functional/30_many_dimensions.sy", "-emit-llvm", "-o", "/home/zox/compiler/2023ustc-jianmu-compiler/tests/output/hidden_functional/30_many_dimensions.ll"],
+            "args": ["/home/zox/compiler/2023ustc-jianmu-compiler/test.sy", "-emit-llvm", "-o", "/home/zox/compiler/2023ustc-jianmu-compiler/test.ll"],
             "cwd": "${workspaceFolder}/build",
         },
         {

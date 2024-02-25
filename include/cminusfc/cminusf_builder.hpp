@@ -200,5 +200,6 @@ class CminusfBuilder : public ASTVisitor {
         BasicBlock *falseBB = nullptr;
         BasicBlock *condBB = nullptr;
         BasicBlock *iteration_endBB = nullptr;
+        BasicBlock *iteration_condBB = nullptr;
     } context;
 };

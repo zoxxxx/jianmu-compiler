@@ -38,4 +38,8 @@ struct Use {
     bool operator==(const Use &other) const {
         return val_ == other.val_ and arg_no_ == other.arg_no_;
     }
+    
+    bool operator <(const Use &other) const {
+        return arg_no_ < other.arg_no_ or (arg_no_ == other.arg_no_ and val_ < other.val_);
+    }
 };

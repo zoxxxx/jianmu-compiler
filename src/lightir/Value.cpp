@@ -13,12 +13,13 @@ bool Value::set_name(std::string name) {
 }
 
 void Value::add_use(User *user, unsigned arg_no) {
-    use_list_.emplace_back(user, arg_no);
+    use_list_.emplace(user, arg_no);
 };
 
 void Value::remove_use(User *user, unsigned arg_no) {
     auto target_use = Use(user, arg_no);
-    use_list_.remove_if([&](const Use &use) { return use == target_use; });
+    // use_list_.remove_if([&](const Use &use) { return use == target_use; });
+    use_list_.erase(target_use);
 }
 
 void Value::replace_all_use_with(Value *new_val) {
