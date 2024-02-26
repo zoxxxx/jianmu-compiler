@@ -569,7 +569,6 @@ Value *CminusfBuilder::visit(ASTCond &node) {
 }
 
 Value *CminusfBuilder::visit(ASTLVal &node) {
-    std::cerr<<node.id<<std::endl;
     auto [ptr, is_const] = scope.find(node.id);
     if (context.is_const_exp and not is_const)
         assert(false && "The expression is not constant");
@@ -629,7 +628,6 @@ Value *CminusfBuilder::visit(ASTLVal &node) {
         }
         return const_ptr;
     }
-    std::cerr<<dim<<' '<<node.array_exp.size()<<std::endl;
     Value *pos_ptr;
     if (ptr->get_type()->get_pointer_element_type()->is_array_type()) {
         array_exp.insert(array_exp.begin(), CONST_INT(0));

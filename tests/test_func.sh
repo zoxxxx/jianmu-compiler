@@ -1,6 +1,6 @@
 #!/bin/bash
 ulimit -s 4096000
-timeout=120
+timeout=60
 project_dir=$(realpath ../)
 sylib_dir=$(realpath "$project_dir"/src/sylib)
 output_dir=output
@@ -105,7 +105,7 @@ for case in $testcases; do
 		check_return_value $? 0 "CE" "cminusfc compiler error" || continue
 
 		# gcc compile asm to executable
-		loongarch64-unknown-linux-gnu-gcc -static \
+		loongarch64-unknown-linux-gnu-gcc -static -g\
 			"$asm_file" "$sylib_dir"/sylib.c -o "$exe_file" \
 			>>$LOG
 		check_return_value $? 0 "CE" "gcc compiler error" || continue

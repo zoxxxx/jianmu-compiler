@@ -2,15 +2,26 @@
 
 #include "BasicBlock.hpp"
 #include "CodeGenUtil.hpp"
+#include "Constant.hpp"
 #include "Instruction.hpp"
+#include "Module.hpp"
 #include "Register.hpp"
 #include "Value.hpp"
 #include "logging.hpp"
 #include <cassert>
 #include <cstdlib>
 #include <functional>
+#include <initializer_list>
+#include <iomanip>
+#include <iostream>
 #include <string>
 #include <vector>
+
+std::string floatToString(double value, int precision = 15) {
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(precision) << value;
+    return out.str();
+}
 
 void CodeGen::allocate() {
     // 备份 $ra $fp
@@ -188,13 +199,40 @@ void CodeGen::gen_prologue() {
     }
 
     // 将函数参数转移到栈帧上
-    int garg_cnt = 0;
-    int farg_cnt = 0;
+    unsigned int garg_cnt = 0;
+    unsigned int farg_cnt = 0;
+    unsigned int stk_cnt = 0;
     for (auto &arg : context.func->get_args()) {
         if (arg.get_type()->is_float_type()) {
-            store_from_freg(&arg, FReg::fa(farg_cnt++));
+            if(farg_cnt < 8)
+                store_from_freg(&arg, FReg::fa(farg_cnt));
+            else {
+                if(IS_IMM_12(8 * stk_cnt))
+                    append_inst("fld.s $ft0, $fp, " + std::to_string(8 * stk_cnt));
+                else {
+                    load_large_int64(8 * stk_cnt, Reg::t(0));
+                    append_inst("add.d $t0, $fp, $t0");
+                    append_inst("fld.s $ft0, $t0, 0");
+                }
+                store_from_freg(&arg, FReg::ft(0));
+                stk_cnt ++;
+            }
+            farg_cnt ++;
         } else { // int or pointer
-            store_from_greg(&arg, Reg::a(garg_cnt++));
+            if(garg_cnt < 8)
+                store_from_greg(&arg, Reg::a(garg_cnt));
+            else {
+                if(IS_IMM_12(8 * stk_cnt))
+                    append_inst("ld.d $t0, $fp, " + std::to_string(8 * stk_cnt));
+                else {
+                    load_large_int64(8 * stk_cnt, Reg::t(0));
+                    append_inst("add.d $t0, $fp, $t0");
+                    append_inst("ld.d $t0, $t0, 0");
+                }
+                store_from_greg(&arg, Reg::t(0));
+                stk_cnt ++;
+            }
+            garg_cnt ++;
         }
     }
 }
@@ -202,13 +240,12 @@ void CodeGen::gen_prologue() {
 void CodeGen::gen_epilogue() {
     // 根据你的理解设定函数的 epilogue
     append_inst(context.func->get_name() + "_exit", ASMInstruction::Label);
-    if(IS_IMM_12(-static_cast<int>(context.frame_size))){
+    if (IS_IMM_12(-static_cast<int>(context.frame_size))) {
         append_inst("addi.d $sp, $sp, " + std::to_string(context.frame_size));
         append_inst("ld.d $ra, $sp, -8");
         append_inst("ld.d $fp, $sp, -16");
         append_inst("jr $ra");
-    }
-    else{
+    } else {
         load_large_int64(context.frame_size, Reg::t(0));
         append_inst("add.d $sp, $sp, $t0");
         append_inst("ld.d $ra, $sp, -8");
@@ -222,11 +259,14 @@ void CodeGen::gen_ret() {
     auto *retInst = static_cast<ReturnInst *>(context.inst);
     if (retInst->get_num_operand() > 0) {
         auto *ret_val = retInst->get_operand(0);
-        if(ret_val->get_type()->is_integer_type())load_to_greg(ret_val, Reg::a(0));
-        else if(ret_val->get_type()->is_float_type())load_to_freg(ret_val, FReg::fa(0));
-        else assert(false);
-    }
-    else append_inst("addi.d $a0, $zero, 0");
+        if (ret_val->get_type()->is_integer_type())
+            load_to_greg(ret_val, Reg::a(0));
+        else if (ret_val->get_type()->is_float_type())
+            load_to_freg(ret_val, FReg::fa(0));
+        else
+            assert(false);
+    } else
+        append_inst("addi.d $a0, $zero, 0");
     append_inst("b", {context.func->get_name() + "_exit"});
 }
 
@@ -263,6 +303,9 @@ void CodeGen::gen_binary() {
         break;
     case Instruction::sdiv:
         output.emplace_back("div.w $t2, $t0, $t1");
+        break;
+    case Instruction::srem:
+        output.emplace_back("mod.w $t2, $t0, $t1");
         break;
     default:
         assert(false);
@@ -302,8 +345,20 @@ void CodeGen::gen_alloca() {
     auto *allocaInst = static_cast<AllocaInst *>(context.inst);
     auto offset = context.offset_map.at(context.inst);
     int alloca_space = allocaInst->get_alloca_type()->get_size();
-    append_inst("addi.d", {"$t0", "$fp", std::to_string(offset - alloca_space)});
-    append_inst("st.d", {"$t0", "$t0", std::to_string(alloca_space)});
+    if (IS_IMM_12(offset - alloca_space))
+        append_inst("addi.d",
+                    {"$t0", "$fp", std::to_string(offset - alloca_space)});
+    else {
+        load_large_int64(offset - alloca_space, Reg::t(0));
+        append_inst("add.d $t0, $fp, $t0");
+    }
+    if (IS_IMM_12(alloca_space))
+        append_inst("st.d", {"$t0", "$t0", std::to_string(alloca_space)});
+    else {
+        load_large_int64(alloca_space, Reg::t(1));
+        append_inst("add.d $t2, $t0, $t1");
+        append_inst("st.d", {"$t0", "$t2", "0"});
+    }
 }
 
 void CodeGen::gen_load() {
@@ -316,10 +371,14 @@ void CodeGen::gen_load() {
         store_from_freg(context.inst, FReg::ft(0));
     } else {
         // load 整数类型的数据
-        if(type->get_size() == 1)append_inst("ld.b $t0, $t0, 0");
-        else if(type->get_size() == 4)append_inst("ld.w $t0, $t0, 0");
-        else if(type->get_size() == 8)append_inst("ld.d $t0, $t0, 0");
-        else assert(false);
+        if (type->get_size() == 1)
+            append_inst("ld.b $t0, $t0, 0");
+        else if (type->get_size() == 4)
+            append_inst("ld.w $t0, $t0, 0");
+        else if (type->get_size() == 8)
+            append_inst("ld.d $t0, $t0, 0");
+        else
+            assert(false);
         store_from_greg(context.inst, Reg::t(0));
     }
 }
@@ -335,10 +394,14 @@ void CodeGen::gen_store() {
         append_inst("fst.s $ft0, $t0, 0");
     } else {
         load_to_greg(context.inst->get_operand(0), Reg::t(1));
-        if(type->get_size() == 1)append_inst("st.b $t1, $t0, 0");
-        else if(type->get_size() == 4)append_inst("st.w $t1, $t0, 0");
-        else if(type->get_size() == 8)append_inst("st.d $t1, $t0, 0");
-        else assert(false);
+        if (type->get_size() == 1)
+            append_inst("st.b $t1, $t0, 0");
+        else if (type->get_size() == 4)
+            append_inst("st.w $t1, $t0, 0");
+        else if (type->get_size() == 8)
+            append_inst("st.d $t1, $t0, 0");
+        else
+            assert(false);
     }
 }
 
@@ -356,7 +419,7 @@ void CodeGen::gen_icmp() {
         append_inst("or $t2, $t2, $t3");
         append_inst("xori $t2, $t2, 1");
         break;
-    case Instruction::ne: 
+    case Instruction::ne:
         append_inst("slt $t2, $t0, $t1");
         append_inst("slt $t3, $t1, $t0");
         append_inst("or $t2, $t2, $t3");
@@ -410,8 +473,9 @@ void CodeGen::gen_fcmp() {
     default:
         assert(false);
     }
-    append_inst("addi t0, $zero, 0");
-    append_inst("bceqz $fcc0 16");
+    append_inst("addi.w $t0, $zero, 0");
+    append_inst("bceqz $fcc0, 16");
+    append_inst("addi.w $t0, $zero, 1");
     store_from_greg(context.inst, Reg::t(0));
 }
 
@@ -420,54 +484,111 @@ void CodeGen::gen_zext() {
     auto *zextInst = static_cast<ZextInst *>(context.inst);
     auto *op = zextInst->get_operand(0);
     load_to_greg(op, Reg::t(0));
-    store_from_greg(context.inst, Reg::t(0));    
+    store_from_greg(context.inst, Reg::t(0));
 }
 
 void CodeGen::gen_call() {
-    // 函数调用，注意我们只需要通过寄存器传递参数，即不需考虑栈上传参的情况
     auto *callInst = static_cast<CallInst *>(context.inst);
     auto *callee = callInst->get_operand(0);
     auto *func = static_cast<Function *>(callee);
-    
+
     unsigned int garg_cnt = 0;
     unsigned int farg_cnt = 0;
+    unsigned int stk_cnt = 0;
+    unsigned int farg_all = 0;
+    unsigned int garg_all = 0;
+    for (auto &arg : func->get_args()) {
+        if (arg.get_type()->is_float_type())
+            farg_all++;
+        else
+            garg_all++;
+    }
+    int offset = 0;
+    offset += (garg_all > 8 ? garg_all - 8 : 0) * 8;
+    offset += (farg_all > 8 ? farg_all - 8 : 0) * 8;
+    offset = ALIGN(offset, 16);
+    if (IS_IMM_12(offset))
+        append_inst("addi.d $sp, $sp, " + std::to_string(-offset));
+    else {
+        load_large_int64(-offset, Reg::t(0));
+        append_inst("add.d $sp, $sp, $t0");
+    }
     for (auto &arg : func->get_args()) {
         auto *arg_val = callInst->get_operand(garg_cnt + farg_cnt + 1);
         if (arg.get_type()->is_float_type()) {
-            load_to_freg(arg_val, FReg::fa(farg_cnt));
+            if (farg_cnt < 8)
+                load_to_freg(arg_val, FReg::fa(farg_cnt));
+            else {
+                load_to_freg(arg_val, FReg::ft(0));
+                if(IS_IMM_12(8 * stk_cnt))
+                    append_inst("fst.s", {"$ft0", "$sp",
+                                         std::to_string(8 * stk_cnt)});
+                else {
+                    load_large_int64(8 * stk_cnt, Reg::t(0));
+                    append_inst("add.d $t0, $sp, $t0");
+                    append_inst("fst.s", {"$ft0", "$t0", "0"});
+                }
+
+                stk_cnt ++;
+            }
             farg_cnt++;
         } else { // int or pointer
-            load_to_greg(arg_val, Reg::a(garg_cnt));
+            if (garg_cnt < 8)
+                load_to_greg(arg_val, Reg::a(garg_cnt));
+            else {
+                load_to_greg(arg_val, Reg::t(0));
+                if(IS_IMM_12(8 * stk_cnt))
+                    append_inst("st.d", {"$t0", "$sp",
+                                         std::to_string(8 * stk_cnt)});
+                else {
+                    load_large_int64(8 * stk_cnt, Reg::t(1));
+                    append_inst("add.d $t1, $sp, $t1");
+                    append_inst("st.d", {"$t0", "$t1", "0"});
+                }
+                stk_cnt ++;
+            }
             garg_cnt++;
         }
     }
     append_inst("bl", {func->get_name()});
-    if(not callInst->get_type()->is_void_type()){
-        if(callInst->get_type()->is_integer_type() || callInst->get_type()->is_void_type())
+    if(IS_IMM_12(offset))
+        append_inst("addi.d $sp, $sp, " + std::to_string(offset));
+    else {
+        load_large_int64(offset, Reg::t(0));
+        append_inst("add.d $sp, $sp, $t0");
+    }
+    if (not callInst->get_type()->is_void_type()) {
+        if (callInst->get_type()->is_integer_type() ||
+            callInst->get_type()->is_void_type())
             store_from_greg(callInst, Reg::a(0));
-        else if(callInst->get_type()->is_float_type())store_from_freg(callInst, FReg::fa(0));
+        else if (callInst->get_type()->is_float_type())
+            store_from_freg(callInst, FReg::fa(0));
     }
 }
 
 void CodeGen::gen_gep() {
     auto *gepInst = static_cast<GetElementPtrInst *>(context.inst);
     auto *ptr = gepInst->get_operand(0);
-    auto *type = gepInst->get_type();
+    auto *type = ptr->get_type();
     load_to_greg(ptr, Reg::t(0));
     for (unsigned i = 1; i < gepInst->get_num_operand(); i++) {
         auto *idx = gepInst->get_operand(i);
         unsigned int size = 0;
         load_to_greg(idx, Reg::t(1));
-        if(type->is_pointer_type()){
+        if (type->is_pointer_type()) {
             size = type->get_pointer_element_type()->get_size();
             type = type->get_pointer_element_type();
-        }
-        else if(type->is_array_type()){
+
+        } else if (type->is_array_type()) {
             size = type->get_array_element_type()->get_size();
             type = type->get_array_element_type();
+        } else
+            size = type->get_size();
+        if (IS_IMM_12(size)) {
+            append_inst("addi.w", {"$t2", "$zero", std::to_string(size)});
+        } else {
+            load_large_int32(size, Reg::t(2));
         }
-        else size = type->get_size();
-        append_inst("addi.d", {"$t2", "$zero", std::to_string(size)});
         append_inst("mul.d", {"$t1", "$t1", "$t2"});
         append_inst("add.d $t0, $t0, $t1");
     }
@@ -496,28 +617,55 @@ void CodeGen::gen_fptosi() {
 
 void CodeGen::gen_copy_statement(BasicBlock *bb) {
     for (auto &bb_succ : bb->get_succ_basic_blocks()) {
-        for (auto &inst1 : bb_succ->get_instructions()){
+        for (auto &inst1 : bb_succ->get_instructions()) {
             auto inst = &inst1;
-            if(inst->is_phi()){
+            if (inst->is_phi()) {
                 auto *PhiInst = static_cast<class PhiInst *>(inst);
-                for (unsigned int i = 0; i < PhiInst->get_num_operand(); i += 2){
+                for (unsigned int i = 0; i < PhiInst->get_num_operand();
+                     i += 2) {
                     auto *op = PhiInst->get_operand(i);
-                    auto *bb_prev = static_cast<BasicBlock *>(PhiInst->get_operand(i + 1));
-                    if(bb_prev == bb){
+                    auto *bb_prev =
+                        static_cast<BasicBlock *>(PhiInst->get_operand(i + 1));
+                    if (bb_prev == bb) {
                         auto *op_type = op->get_type();
-                        if(op_type->is_integer_type() || op_type->is_pointer_type()){
+                        if (op_type->is_integer_type() ||
+                            op_type->is_pointer_type()) {
                             load_to_greg(op, Reg::t(0));
                             store_from_greg(inst, Reg::t(0));
-                        }
-                        else if(op_type->is_float_type()){
+                        } else if (op_type->is_float_type()) {
                             load_to_freg(op, FReg::ft(0));
                             store_from_freg(inst, FReg::ft(0));
                         }
                     }
                 }
             }
-
         }
+    }
+}
+void CodeGen::create_init_val(Constant *init, std::string &s, bool &is_first) {
+    if (dynamic_cast<ConstantInt *>(init) != nullptr) {
+        if (not is_first)
+            s += ", ";
+        else {
+            s += ".word ";
+            is_first = false;
+        }
+        s += std::to_string(dynamic_cast<ConstantInt *>(init)->get_value());
+    } else if (dynamic_cast<ConstantFP *>(init) != nullptr) {
+        if (not is_first)
+            s += ", ";
+        else {
+            s += ".float ";
+            is_first = false;
+        }
+        s += floatToString(dynamic_cast<ConstantFP *>(init)->get_value());
+    } else if (dynamic_cast<ConstantArray *>(init) != nullptr) {
+        auto *array = dynamic_cast<ConstantArray *>(init);
+        for (unsigned int i = 0; i < array->get_size_of_array(); i++) {
+            create_init_val(array->get_element_value(i), s, is_first);
+        }
+    } else {
+        assert(false);
     }
 }
 void CodeGen::run() {
@@ -541,6 +689,9 @@ void CodeGen::run() {
         append_inst(".section", {".bss", "\"aw\"", "@nobits"},
                     ASMInstruction::Atrribute);
         for (auto &global : m->get_global_variable()) {
+            if (global.get_init() != nullptr &&
+                dynamic_cast<ConstantZero *>(global.get_init()) == nullptr)
+                continue;
             auto size =
                 global.get_type()->get_pointer_element_type()->get_size();
             append_inst(".globl", {global.get_name()},
@@ -552,6 +703,36 @@ void CodeGen::run() {
             append_inst(global.get_name(), ASMInstruction::Label);
             append_inst(".space", {std::to_string(size)},
                         ASMInstruction::Atrribute);
+        }
+
+        append_inst(".data", ASMInstruction::Atrribute);
+        for (auto &global : m->get_global_variable()) {
+            if (global.get_init() == nullptr ||
+                dynamic_cast<ConstantZero *>(global.get_init()) != nullptr)
+                continue;
+            Type *global_type = global.get_type()->get_pointer_element_type();
+            if (global_type->is_array_type()) {
+                std::string init_val = "";
+                bool is_first = true;
+                create_init_val(global.get_init(), init_val, is_first);
+                append_inst((global.get_name() + ":").c_str(), {init_val},
+                            ASMInstruction::Atrribute);
+            } else {
+                if (global_type->is_int32_type()) {
+                    append_inst((global.get_name() + ": .word").c_str(),
+                                {std::to_string(dynamic_cast<ConstantInt *>(
+                                                    global.get_init())
+                                                    ->get_value())},
+                                ASMInstruction::Atrribute);
+                } else if (global_type->is_float_type()) {
+                    append_inst((global.get_name() + ": .float").c_str(),
+                                {floatToString(dynamic_cast<ConstantFP *>(
+                                                   global.get_init())
+                                                   ->get_value())},
+                                ASMInstruction::Atrribute);
+                } else
+                    assert(false);
+            }
         }
     }
 
@@ -592,6 +773,7 @@ void CodeGen::run() {
                     case Instruction::sub:
                     case Instruction::mul:
                     case Instruction::sdiv:
+                    case Instruction::srem:
                         gen_binary();
                         break;
                     case Instruction::fadd:
