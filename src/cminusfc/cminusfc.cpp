@@ -11,7 +11,8 @@
 #include <string>
 
 using std::string;
-using std::operator""s;
+using namespace std::string_literals;
+
 
 struct Config {
     string exe_name; // compiler exe name

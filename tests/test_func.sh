@@ -93,7 +93,7 @@ for case in $testcases; do
 	echo -n "$case_base_name..."
 	# if debug or ll mode on, generate .ll also
 	if [ $debug_mode = true ] || [ $ll_mode = true ]; then
-		timeout $timeout bash -c "cminusfc -emit-llvm $case -o $ll_file" >>$LOG 2>&1
+		timeout $timeout bash -c "cminusfc -emit-llvm -mem2reg $case -o $ll_file" >>$LOG 2>&1
 		check_compile_time $? "TLE" "cminusfc compiler error" || continue
 	fi
 

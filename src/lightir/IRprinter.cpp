@@ -1,4 +1,5 @@
 #include "IRprinter.hpp"
+#include "Function.hpp"
 #include "Instruction.hpp"
 #include <cassert>
 #include <type_traits>

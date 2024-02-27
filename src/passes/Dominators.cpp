@@ -35,6 +35,17 @@ void Dominators::create_reverse_post_order(Function *f) {
     // 分析得到 f 中各个基本块的逆后序遍历
     std::set<BasicBlock *> visited;
     dfs(f->get_entry_block(), visited);
+    std::vector<BasicBlock *> to_erase;
+    for (auto &bb1 : f->get_basic_blocks()) {
+        auto bb = &bb1;
+        if (visited.find(bb) == visited.end()) {
+            to_erase.push_back(bb);
+        }
+    }
+    for (auto &bb : to_erase) {
+        bb->erase_from_parent();
+        delete bb;
+    }
 }
 
 BasicBlock *Dominators::intersect(BasicBlock *bb1, BasicBlock *bb2) {

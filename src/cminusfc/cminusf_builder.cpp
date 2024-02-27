@@ -109,8 +109,6 @@ Constant *InitValCalc::get_const_value(Module *module) {
         for (int j = 0; j < (int)constant_array.size(); j++) {
             sub_constant_array.push_back(constant_array[j]);
             if ((j + 1) % array_size[i] == 0) {
-                // std::cerr << "j=" << j << std::endl;
-                // std::cerr << "array_size[i]=" << array_size[i] << std::endl;
                 new_constant_array.push_back(ConstantArray::get(
                     ArrayType::get(sub_constant_array[0]->get_type(),
                                    array_size[i]),

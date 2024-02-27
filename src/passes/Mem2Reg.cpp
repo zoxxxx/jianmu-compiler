@@ -38,6 +38,7 @@ void Mem2Reg::generate_phi() {
             auto inst = &inst1;
             if(inst->is_alloca()) {
                 std::set<BasicBlock *> used_bb;
+                used_bb.insert(bb);
                 for (auto & use : inst->get_use_list()) {
                     if (dynamic_cast<StoreInst *>(use.val_) != nullptr) {
                         auto store = dynamic_cast<StoreInst *>(use.val_);
@@ -128,6 +129,9 @@ void Mem2Reg::rename(BasicBlock *bb) {
                 auto phi = dynamic_cast<PhiInst *>(inst);
                 auto lval = phi_map_[phi];
                 if(var_stack_.find(lval) == var_stack_.end())
+                    continue;
+                // assert(!var_stack_[lval].empty());
+                if(var_stack_[lval].empty())
                     continue;
                 auto rval = var_stack_[lval].top();
                 phi->add_phi_pair_operand(rval, bb);
