@@ -23,8 +23,11 @@ class Module {
     Type *get_void_type();
     Type *get_label_type();
     IntegerType *get_int1_type();
+    IntegerType *get_int8_type();
     IntegerType *get_int32_type();
+    IntegerType *get_int64_type();
     PointerType *get_int32_ptr_type();
+    PointerType *get_int8_ptr_type();
     FloatType *get_float_type();
     PointerType *get_float_ptr_type();
 
@@ -47,7 +50,9 @@ class Module {
     llvm::ilist<Function> function_list_;
 
     std::unique_ptr<IntegerType> int1_ty_;
+    std::unique_ptr<IntegerType> int8_ty_;
     std::unique_ptr<IntegerType> int32_ty_;
+    std::unique_ptr<IntegerType> int64_ty_;
     std::unique_ptr<Type> label_ty_;
     std::unique_ptr<Type> void_ty_;
     std::unique_ptr<FloatType> float32_ty_;

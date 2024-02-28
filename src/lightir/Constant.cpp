@@ -22,11 +22,20 @@ static std::unordered_map<std::pair<int, Module *>,
 static std::unordered_map<std::pair<bool, Module *>,
                           std::unique_ptr<ConstantInt>, pair_hash>
     cached_bool;
+static std::unordered_map<std::pair<long long, Module *>, 
+                            std::unique_ptr<ConstantInt>, pair_hash>
+    cached_long;
 static std::unordered_map<std::pair<float, Module *>,
                           std::unique_ptr<ConstantFP>, pair_hash>
     cached_float;
 static std::unordered_map<Type *, std::unique_ptr<ConstantZero>> cached_zero;
-
+ConstantInt *ConstantInt::get(long long val, Module *m) {
+    if (cached_long.find(std::make_pair(val, m)) != cached_long.end())
+        return cached_long[std::make_pair(val, m)].get();
+    return (cached_long[std::make_pair(val, m)] = std::unique_ptr<ConstantInt>(
+                new ConstantInt(m->get_int64_type(), val)))
+        .get();
+}
 ConstantInt *ConstantInt::get(int val, Module *m) {
     if (cached_int.find(std::make_pair(val, m)) != cached_int.end())
         return cached_int[std::make_pair(val, m)].get();

@@ -63,6 +63,7 @@ class CodeGen {
     void gen_gep();
     void gen_sitofp();
     void gen_fptosi();
+    void gen_bitcast();
     void gen_epilogue();
     
     void gen_copy_statement(BasicBlock *bb);

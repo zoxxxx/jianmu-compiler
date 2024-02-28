@@ -2,6 +2,7 @@
 #include "Function.hpp"
 #include "Instruction.hpp"
 #include <cassert>
+#include <string>
 #include <type_traits>
 
 std::string print_as_op(Value *v, bool print_ty) {
@@ -90,6 +91,8 @@ std::string print_instr_op_name(Instruction::OpID id) {
         return "fptosi";
     case Instruction::sitofp:
         return "sitofp";
+    case Instruction::bitcast:
+        return "bitcast";
     }
     assert(false && "Must be bug");
 }
@@ -334,5 +337,18 @@ std::string PhiInst::print() {
             }
         }
     }
+    return instr_ir;
+}
+
+std::string BitCastInst::print() {
+    std::string instr_ir;
+    instr_ir += "%";
+    instr_ir += this->get_name();
+    instr_ir += " = ";
+    instr_ir += get_instr_op_name();
+    instr_ir += " ";
+    instr_ir += print_as_op(this->get_operand(0), true);
+    instr_ir += " to ";
+    instr_ir += this->get_dest_type()->print();
     return instr_ir;
 }

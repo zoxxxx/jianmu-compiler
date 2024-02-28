@@ -8,6 +8,7 @@
 #include "Constant.hpp"
 #include "Function.hpp"
 #include "IRBuilder.hpp"
+#include "Instruction.hpp"
 #include "Module.hpp"
 #include "Type.hpp"
 #include "Value.hpp"
@@ -76,7 +77,7 @@ struct InitValCalc {
     }
     bool is_single_val() { return is_single_exp; }
     Constant *get_const_value(Module *module);
-    void store_value(Module *module, IRBuilder *builder, Value *alloca_inst);
+    void store_value(Module *module, IRBuilder *builder, AllocaInst *alloca_inst, Scope &scope);
 };
 
 class CminusfBuilder : public ASTVisitor {
@@ -90,6 +91,8 @@ class CminusfBuilder : public ASTVisitor {
         auto *TyFloat = module->get_float_type();
         auto *TyInt32Ptr = module->get_int32_ptr_type();
         auto *TyFloatPtr = module->get_float_ptr_type();
+        auto *TyInt8Ptr = module->get_int8_ptr_type();
+        auto *Tyint64 = module->get_int64_type();
 
         auto *getint_type = FunctionType::get(TyInt32, {});
         auto *getint_fun =
@@ -137,6 +140,10 @@ class CminusfBuilder : public ASTVisitor {
         auto *stoptime_fun =
             Function::create(stoptime_type, "_sysy_stoptime", module.get());
 
+        auto *memset_type = FunctionType::get(TyVoid, {TyInt8Ptr, TyInt32, Tyint64});
+        auto *memset_fun =
+            Function::create(memset_type, "memset", module.get());
+
         scope.enter();
         scope.push("getint", getint_fun);
         scope.push("getch", getch_fun);
@@ -150,6 +157,7 @@ class CminusfBuilder : public ASTVisitor {
         scope.push("putfarray", putfarray_fun);
         scope.push("_sysy_starttime", starttime_fun);
         scope.push("_sysy_stoptime", stoptime_fun);
+        scope.push("memset", memset_fun);
 
         const_scope.enter();
     }

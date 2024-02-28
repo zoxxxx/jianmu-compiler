@@ -18,9 +18,10 @@ class ConstantInt : public Constant {
     ConstantInt(Type *ty, int val) : Constant(ty, ""), value_(val) {}
 
   public:
-    int get_value() { return value_; }
+    long long get_value() { return value_; }
     static ConstantInt *get(int val, Module *m);
     static ConstantInt *get(bool val, Module *m);
+    static ConstantInt *get(long long val, Module *m);
     virtual std::string print() override;
 };
 

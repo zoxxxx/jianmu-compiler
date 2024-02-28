@@ -1,0 +1,396 @@
+20240227 23:51
+zox@zox-virtual-machine:~/compiler/2023ustc-jianmu-compiler/tests$ '/home/zox/compiler/2023ustc-jianmu-compiler/tests/test_func.sh' /home/zox/compiler/2023ustc-jianmu-compiler/tests/performance ll
+[info] Start testing, using testcase dir: /home/zox/compiler/2023ustc-jianmu-compiler/tests/performance
+00_bitset1...
+Timer@0056-0064: 0H-0M-0S-751194us
+TOTAL: 0H-0M-0S-751194us
+OK
+00_bitset2...
+Timer@0056-0064: 0H-0M-1S-444089us
+TOTAL: 0H-0M-1S-444089us
+OK
+00_bitset3...
+Timer@0056-0064: 0H-0M-2S-124539us
+TOTAL: 0H-0M-2S-124539us
+OK
+01_mm1...
+Timer@0065-0084: 0H-0M-0S-880760us
+TOTAL: 0H-0M-0S-880760us
+OK
+01_mm2...
+Timer@0065-0084: 0H-0M-0S-751205us
+TOTAL: 0H-0M-0S-751205us
+OK
+01_mm3...
+Timer@0065-0084: 0H-0M-0S-595505us
+TOTAL: 0H-0M-0S-595505us
+OK
+02_mv1...
+Timer@0059-0067: 0H-0M-2S-50077us
+TOTAL: 0H-0M-2S-50077us
+OK
+02_mv2...
+Timer@0059-0067: 0H-0M-0S-706314us
+TOTAL: 0H-0M-0S-706314us
+OK
+02_mv3...
+Timer@0059-0067: 0H-0M-1S-221113us
+TOTAL: 0H-0M-1S-221113us
+OK
+03_sort1...
+Timer@0090-0102: 0H-0M-0S-870067us
+TOTAL: 0H-0M-0S-870067us
+OK
+03_sort2...
+Timer@0090-0102: 0H-0M-14S-93968us
+TOTAL: 0H-0M-14S-93968us
+OK
+03_sort3...
+Timer@0090-0102: 0H-0M-3S-10119us
+TOTAL: 0H-0M-3S-10119us
+OK
+04_spmv1...
+Timer@0039-0047: 0H-0M-0S-526791us
+TOTAL: 0H-0M-0S-526791us
+OK
+04_spmv2...
+Timer@0039-0047: 0H-0M-0S-439326us
+TOTAL: 0H-0M-0S-439326us
+OK
+04_spmv3...
+Timer@0039-0047: 0H-0M-0S-364572us
+TOTAL: 0H-0M-0S-364572us
+OK
+brainfuck-bootstrap...
+Timer@0116-0118: 0H-0M-2S-45012us
+TOTAL: 0H-0M-2S-45012us
+OK
+brainfuck-mandelbrot-nerf...
+Timer@0116-0118: 0H-0M-8S-279752us
+TOTAL: 0H-0M-8S-279752us
+OK
+brainfuck-pi-nerf...
+Timer@0116-0118: 0H-0M-0S-416431us
+TOTAL: 0H-0M-0S-416431us
+OK
+conv0...
+Timer@0109-0116: 0H-0M-4S-874729us
+TOTAL: 0H-0M-4S-874729us
+OK
+conv1...
+Timer@0109-0116: 0H-0M-9S-634101us
+TOTAL: 0H-0M-9S-634101us
+OK
+conv2...
+Timer@0109-0116: 0H-0M-7S-309637us
+TOTAL: 0H-0M-7S-309637us
+OK
+crypto-1...
+Timer@0161-0184: 0H-0M-1S-544867us
+TOTAL: 0H-0M-1S-544867us
+OK
+crypto-2...
+Timer@0161-0184: 0H-0M-1S-276528us
+TOTAL: 0H-0M-1S-276528us
+OK
+crypto-3...
+Timer@0161-0184: 0H-0M-1S-706001us
+TOTAL: 0H-0M-1S-706001us
+OK
+dead-code-elimination-1...
+Timer@100016-100032: 0H-0M-0S-20us
+TOTAL: 0H-0M-0S-20us
+OK
+dead-code-elimination-2...
+Timer@100016-100032: 0H-0M-0S-2120us
+TOTAL: 0H-0M-0S-2120us
+OK
+dead-code-elimination-3...
+Timer@100016-100032: 0H-0M-0S-210125us
+TOTAL: 0H-0M-0S-210125us
+OK
+fft0...
+Timer@0060-0079: 0H-0M-3S-989284us
+TOTAL: 0H-0M-3S-989284us
+OK
+fft1...
+Timer@0060-0079: 0H-0M-8S-446500us
+TOTAL: 0H-0M-8S-446500us
+OK
+fft2...
+Timer@0060-0079: 0H-0M-8S-160992us
+TOTAL: 0H-0M-8S-160992us
+OK
+floyd-0...
+Timer@0062-0064: 0H-0M-0S-19us
+TOTAL: 0H-0M-0S-19us
+OK
+floyd-1...
+Timer@0062-0064: 0H-0M-0S-13179us
+TOTAL: 0H-0M-0S-13179us
+OK
+floyd-2...
+Timer@0062-0064: 0H-0M-6S-7587us
+TOTAL: 0H-0M-6S-7587us
+OK
+gameoflife-gosper...
+Timer@0095-0106: 0H-0M-4S-313064us
+TOTAL: 0H-0M-4S-313064us
+OK
+gameoflife-oscillator...
+Timer@0095-0106: 0H-0M-3S-151655us
+TOTAL: 0H-0M-3S-151655us
+OK
+gameoflife-p61glidergun...
+Timer@0095-0106: 0H-0M-3S-193224us
+TOTAL: 0H-0M-3S-193224us
+OK
+hoist-1...
+Timer@0121-0123: 0H-0M-0S-61467us
+TOTAL: 0H-0M-0S-61467us
+OK
+hoist-2...
+Timer@0121-0123: 0H-0M-59S-830983us
+TOTAL: 0H-0M-59S-830983us
+OK
+hoist-3...
+Timer@0121-0123: 0H-9M-49S-877126us
+TOTAL: 0H-9M-49S-877126us
+OK
+instruction-combining-1...
+Timer@10015-10030: 0H-0M-0S-21us
+TOTAL: 0H-0M-0S-21us
+OK
+instruction-combining-2...
+Timer@10015-10030: 0H-0M-0S-5003us
+TOTAL: 0H-0M-0S-5003us
+OK
+instruction-combining-3...
+Timer@10015-10030: 0H-0M-0S-5311us
+TOTAL: 0H-0M-0S-5311us
+OK
+integer-divide-optimization-1...
+Timer@1016-1031: 0H-0M-0S-30522us
+TOTAL: 0H-0M-0S-30522us
+OK
+integer-divide-optimization-2...
+Timer@1016-1031: 0H-0M-15S-903976us
+TOTAL: 0H-0M-15S-903976us
+OK
+integer-divide-optimization-3...
+Timer@1016-1031: 0H-4M-17S-396764us
+TOTAL: 0H-4M-17S-396764us
+OK
+median0...
+Timer@0059-0061: 0H-0M-0S-844594us
+TOTAL: 0H-0M-0S-844594us
+OK
+median1...
+Timer@0059-0061: 0H-0M-0S-870500us
+TOTAL: 0H-0M-0S-870500us
+OK
+median2...
+Timer@0059-0061: 0H-0M-5S-141912us
+TOTAL: 0H-0M-5S-141912us
+OK
+shuffle0...
+Timer@0078-0090: 0H-0M-1S-923600us
+TOTAL: 0H-0M-1S-923600us
+OK
+shuffle1...
+Timer@0078-0090: 0H-0M-1S-749652us
+TOTAL: 0H-0M-1S-749652us
+OK
+shuffle2...
+Timer@0078-0090: 0H-0M-1S-261713us
+TOTAL: 0H-0M-1S-261713us
+OK
+sl1...
+Timer@0013-0053: 0H-0M-2S-241679us
+TOTAL: 0H-0M-2S-241679us
+OK
+sl2...
+Timer@0013-0053: 0H-0M-0S-783374us
+TOTAL: 0H-0M-0S-783374us
+OK
+sl3...
+Timer@0013-0053: 0H-0M-0S-406062us
+TOTAL: 0H-0M-0S-406062us
+OK
+stencil0...
+Timer@0023-0059: 0H-0M-0S-9493us
+TOTAL: 0H-0M-0S-9493us
+OK
+stencil1...
+Timer@0023-0059: 0H-0M-0S-28244us
+TOTAL: 0H-0M-0S-28244us
+OK
+transpose0...
+Timer@0028-0047: 0H-0M-0S-595332us
+TOTAL: 0H-0M-0S-595332us
+OK
+transpose1...
+Timer@0028-0047: 0H-0M-0S-718465us
+TOTAL: 0H-0M-0S-718465us
+OK
+transpose2...
+Timer@0028-0047: 0H-0M-1S-309144us
+TOTAL: 0H-0M-1S-309144us
+OK
+
+20240228 00:46
+zox@zox-virtual-machine:~/compiler/2023ustc-jianmu-compiler/tests$ '/home/zox/compiler/2023ustc-jianmu-compiler/tests/test_func.sh' /home/zox/compiler/2023ustc-jianmu-compiler/tests/performance test 
+[info] Start testing, using testcase dir: /home/zox/compiler/2023ustc-jianmu-compiler/tests/performance
+00_bitset1...
+Timer@0056-0064: 0H-0M-7S-978374us
+TOTAL: 0H-0M-7S-978374us
+OK
+00_bitset2...
+Timer@0056-0064: 0H-0M-15S-441869us
+TOTAL: 0H-0M-15S-441869us
+OK
+00_bitset3...
+Timer@0056-0064: 0H-0M-23S-87698us
+TOTAL: 0H-0M-23S-87698us
+OK
+01_mm1...
+Timer@0065-0084: 0H-0M-24S-237331us
+TOTAL: 0H-0M-24S-237331us
+OK
+01_mm2...
+Timer@0065-0084: 0H-0M-21S-690865us
+TOTAL: 0H-0M-21S-690865us
+OK
+01_mm3...
+Timer@0065-0084: 0H-0M-16S-133060us
+TOTAL: 0H-0M-16S-133060us
+OK
+02_mv1...
+Timer@0059-0067: 0H-0M-11S-612675us
+TOTAL: 0H-0M-11S-612675us
+OK
+02_mv2...
+Timer@0059-0067: 0H-0M-6S-41631us
+TOTAL: 0H-0M-6S-41631us
+OK
+02_mv3...
+Timer@0059-0067: 0H-0M-11S-286810us
+TOTAL: 0H-0M-11S-286810us
+OK
+03_sort1...
+Timer@0090-0102: 0H-0M-5S-871844us
+TOTAL: 0H-0M-5S-871844us
+OK
+03_sort2...
+Timer@0090-0102: 0H-1M-36S-306669us
+TOTAL: 0H-1M-36S-306669us
+OK
+03_sort3...
+Timer@0090-0102: 0H-0M-19S-123851us
+TOTAL: 0H-0M-19S-123851us
+OK
+04_spmv1...
+Timer@0039-0047: 0H-0M-12S-293313us
+TOTAL: 0H-0M-12S-293313us
+OK
+04_spmv2...
+Timer@0039-0047: 0H-0M-8S-488088us
+TOTAL: 0H-0M-8S-488088us
+OK
+04_spmv3...
+Timer@0039-0047: 0H-0M-10S-173964us
+TOTAL: 0H-0M-10S-173964us
+OK
+brainfuck-bootstrap...
+Timer@0116-0118: 0H-1M-57S-458101us
+TOTAL: 0H-1M-57S-458101us
+OK
+brainfuck-mandelbrot-nerf...
+Timer@0116-0118: 0H-5M-29S-96880us
+TOTAL: 0H-5M-29S-96880us
+OK
+brainfuck-pi-nerf...
+Timer@0116-0118: 0H-0M-18S-625478us
+TOTAL: 0H-0M-18S-625478us
+OK
+conv0...
+Timer@0109-0116: 0H-0M-31S-282629us
+TOTAL: 0H-0M-31S-282629us
+OK
+conv1...
+Timer@0109-0116: 0H-0M-50S-471245us
+TOTAL: 0H-0M-50S-471245us
+OK
+conv2...
+Timer@0109-0116: 0H-0M-38S-799347us
+TOTAL: 0H-0M-38S-799347us
+OK
+crypto-1...
+Timer@0161-0184: 0H-0M-24S-109611us
+TOTAL: 0H-0M-24S-109611us
+OK
+crypto-2...
+Timer@0161-0184: 0H-0M-19S-749654us
+TOTAL: 0H-0M-19S-749654us
+OK
+crypto-3...
+Timer@0161-0184: 0H-0M-25S-655355us
+TOTAL: 0H-0M-25S-655355us
+OK
+dead-code-elimination-1...
+Timer@100016-100032: 0H-0M-0S-404us
+TOTAL: 0H-0M-0S-404us
+OK
+dead-code-elimination-2...
+Timer@100016-100032: 0H-0M-0S-16294us
+TOTAL: 0H-0M-0S-16294us
+OK
+dead-code-elimination-3...
+Timer@100016-100032: 0H-0M-1S-833288us
+TOTAL: 0H-0M-1S-833288us
+OK
+fft0...
+Timer@0060-0079: 0H-0M-18S-995922us
+TOTAL: 0H-0M-18S-995922us
+OK
+fft1...
+Timer@0060-0079: 0H-0M-41S-333324us
+TOTAL: 0H-0M-41S-333324us
+OK
+fft2...
+Timer@0060-0079: 0H-0M-39S-891132us
+TOTAL: 0H-0M-39S-891132us
+OK
+floyd-0...
+Timer@0062-0064: 0H-0M-0S-982us
+TOTAL: 0H-0M-0S-982us
+OK
+floyd-1...
+Timer@0062-0064: 0H-0M-0S-277364us
+TOTAL: 0H-0M-0S-277364us
+OK
+floyd-2...
+Timer@0062-0064: 0H-2M-26S-811528us
+TOTAL: 0H-2M-26S-811528us
+OK
+gameoflife-gosper...
+Timer@0095-0106: 0H-1M-57S-216968us
+TOTAL: 0H-1M-57S-216968us
+OK
+gameoflife-oscillator...
+Timer@0095-0106: 0H-1M-49S-891768us
+TOTAL: 0H-1M-49S-891768us
+OK
+gameoflife-p61glidergun...
+Timer@0095-0106: 0H-1M-48S-264819us
+TOTAL: 0H-1M-48S-264819us
+OK
+hoist-1...
+Timer@0121-0123: 0H-0M-0S-751491us
+TOTAL: 0H-0M-0S-751491us
+OK
+hoist-2...
+Timer@0121-0123: 0H-12M-47S-771872us
+TOTAL: 0H-12M-47S-771872us
+OK
+hoist-3...

@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstddef>
 #include <memory>
+#include <sys/types.h>
 #include <vector>
 
 #define CONST_FP(num) ConstantFP::get((float)num, module.get())
@@ -23,7 +24,10 @@ Type *INT_T;
 Type *INTPTR_T;
 Type *FLOAT_T;
 Type *FLOATPTR_T;
+Type *CHAR_T;
+Type *CHARPTR_T;
 Type *BOOL_T;
+Type *INT64_T;
 
 /*
  * use CMinusfBuilder::Scope to construct scopes
@@ -34,7 +38,7 @@ Type *BOOL_T;
  */
 
 void InitValCalc::store_value(Module *module, IRBuilder *builder,
-                              Value *alloca_inst) {
+                              AllocaInst *alloca_inst, Scope &scope) {
     if (single_val != nullptr) {
         if (single_val->get_type()->is_float_type() && type->is_integer_type())
             single_val = builder->create_fptosi(single_val, type);
@@ -42,6 +46,30 @@ void InitValCalc::store_value(Module *module, IRBuilder *builder,
                  type->is_float_type())
             single_val = builder->create_sitofp(single_val, type);
         builder->create_store(single_val, alloca_inst);
+        return;
+    }
+    bool all_zero = true;
+    for (int i = 0; i < (int)suffix_product[0]; i++) {
+        if (dynamic_cast<Constant *>(vals[i]) == nullptr)
+            all_zero = false;
+        if (dynamic_cast<ConstantInt *>(vals[i]) != nullptr &&
+            dynamic_cast<ConstantInt *>(vals[i])->get_value() != 0)
+            all_zero = false;
+        if (dynamic_cast<ConstantFP *>(vals[i]) != nullptr &&
+            dynamic_cast<ConstantFP *>(vals[i])->get_value() != 0.)
+            all_zero = false;
+        if (not all_zero)
+            break;
+    }
+    if (all_zero) {
+        auto cast =
+            builder->create_bitcast(alloca_inst, module->get_int8_ptr_type());
+        builder->create_call(
+            scope.find("memset").first,
+            {cast, ConstantInt::get(0, module),
+             ConstantInt::get(
+                 (long long)alloca_inst->get_alloca_type()->get_size(),
+                 module)});
         return;
     }
     for (int i = 0; i < (int)suffix_product[0]; i++) {
@@ -85,7 +113,7 @@ Constant *InitValCalc::get_const_value(Module *module) {
         else
             return dynamic_cast<Constant *>(single_val);
     }
-
+    bool all_zero = true;
     std::vector<Constant *> constant_array;
     for (int i = 0; i < (int)suffix_product[0]; i++) {
         auto val = dynamic_cast<Constant *>(vals[i]);
@@ -100,8 +128,15 @@ Constant *InitValCalc::get_const_value(Module *module) {
                 (float)(dynamic_cast<ConstantInt *>(val)->get_value()), module);
         else
             constant_array.push_back(val);
+        if (dynamic_cast<ConstantInt *>(val) != nullptr &&
+            dynamic_cast<ConstantInt *>(val)->get_value() != 0)
+            all_zero = false;
+        if (dynamic_cast<ConstantFP *>(val) != nullptr &&
+            dynamic_cast<ConstantFP *>(val)->get_value() != 0.)
+            all_zero = false;
     }
-
+    if (all_zero)
+        return ConstantZero::get(type, module);
     std::vector<Constant *> new_constant_array;
     for (int i = (int)array_size.size() - 1; i >= 0; i--) {
         std::vector<Constant *> sub_constant_array;
@@ -128,7 +163,10 @@ Value *CminusfBuilder::visit(ASTProgram &node) {
     INTPTR_T = module->get_int32_ptr_type();
     FLOAT_T = module->get_float_type();
     FLOATPTR_T = module->get_float_ptr_type();
+    CHAR_T = module->get_int8_type();
+    CHARPTR_T = module->get_int8_ptr_type();
     BOOL_T = module->get_int1_type();
+    INT64_T = module->get_int64_type();
     for (auto &def_or_decl : node.defs_and_decls) {
         std::visit([this](auto &&arg) { arg->accept(*this); }, def_or_decl);
     }
@@ -192,7 +230,7 @@ Value *CminusfBuilder::visit(ASTConstDef &node) {
             auto alloca_inst = builder->create_alloca(var_type);
             scope.push(node.id, alloca_inst, true);
             context.init_val_calc->store_value(module.get(), builder.get(),
-                                               alloca_inst);
+                                               alloca_inst, scope);
             const_scope.push(
                 node.id, context.init_val_calc->get_const_value(module.get()));
         }
@@ -241,7 +279,7 @@ Value *CminusfBuilder::visit(ASTVarDef &node) {
             auto alloca_inst = builder->create_alloca(var_type);
             scope.push(node.id, alloca_inst, false);
             context.init_val_calc->store_value(module.get(), builder.get(),
-                                               alloca_inst);
+                                               alloca_inst, scope);
         }
     } else {
         if (scope.in_global()) {

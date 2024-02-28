@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -364,4 +365,17 @@ PhiInst *PhiInst::create_phi(Type *ty, BasicBlock *bb,
                              std::vector<Value *> vals,
                              std::vector<BasicBlock *> val_bbs) {
     return create(ty, vals, val_bbs, bb);
+}
+
+BitCastInst::BitCastInst(Value *val, Type *ty, BasicBlock *bb)
+    : BaseInst<BitCastInst>(ty, bitcast, bb) {
+    assert(val->get_type()->is_pointer_type() &&
+           "BitCastInst operand is not pointer");
+    assert(ty->is_pointer_type() && "BitCastInst destination type is not "
+                                    "pointer");
+    add_operand(val);
+}
+
+BitCastInst *BitCastInst::create_bitcast(Value *val, Type *ty, BasicBlock *bb) {
+    return create(val, ty, bb);
 }

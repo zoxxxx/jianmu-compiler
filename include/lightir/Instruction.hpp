@@ -50,8 +50,9 @@ class Instruction : public User, public llvm::ilist_node<Instruction> {
         getelementptr,
         zext, // zero extend
         fptosi,
-        sitofp
+        sitofp,
         // float binary operators Logical operators
+        bitcast
 
     };
     /* @parent: if parent!=nullptr, auto insert to bb
@@ -102,6 +103,7 @@ class Instruction : public User, public llvm::ilist_node<Instruction> {
     bool is_call() const { return op_id_ == call; }
     bool is_gep() const { return op_id_ == getelementptr; }
     bool is_zext() const { return op_id_ == zext; }
+    bool is_bitcast() const { return op_id_ == bitcast; }
 
     bool isBinary() const {
         return (is_add() || is_sub() || is_mul() || is_div() || is_fadd() ||
@@ -358,5 +360,17 @@ class PhiInst : public BaseInst<PhiInst> {
         this->add_operand(val);
         this->add_operand(pre_bb);
     }
+    virtual std::string print() override;
+};
+
+class BitCastInst : public BaseInst<BitCastInst> {
+    friend BaseInst<BitCastInst>;
+
+  private:
+    BitCastInst(Value *val, Type *ty, BasicBlock *bb);
+
+  public:
+    static BitCastInst *create_bitcast(Value *val, Type *ty, BasicBlock *bb);
+    Type *get_dest_type() const { return get_type(); };
     virtual std::string print() override;
 };

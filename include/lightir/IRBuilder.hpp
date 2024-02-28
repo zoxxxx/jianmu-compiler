@@ -3,6 +3,7 @@
 #include "BasicBlock.hpp"
 #include "Function.hpp"
 #include "Instruction.hpp"
+#include "Type.hpp"
 #include "Value.hpp"
 
 class IRBuilder {
@@ -129,5 +130,8 @@ class IRBuilder {
     }
     FBinaryInst *create_fdiv(Value *lhs, Value *rhs) {
         return FBinaryInst::create_fdiv(lhs, rhs, this->BB_);
+    }
+    BitCastInst *create_bitcast(Value *val, Type *ty) {
+        return BitCastInst::create_bitcast(val, ty, this->BB_);
     }
 };

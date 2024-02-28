@@ -615,6 +615,13 @@ void CodeGen::gen_fptosi() {
     store_from_greg(context.inst, Reg::t(0));
 }
 
+void CodeGen::gen_bitcast() {
+    // bitcast 指令
+    auto *bitcastInst = static_cast<BitCastInst *>(context.inst);
+    auto *op = bitcastInst->get_operand(0);
+    context.offset_map.at(context.inst) = context.offset_map.at(op);
+}
+
 void CodeGen::gen_copy_statement(BasicBlock *bb) {
     for (auto &bb_succ : bb->get_succ_basic_blocks()) {
         for (auto &inst1 : bb_succ->get_instructions()) {
@@ -824,6 +831,9 @@ void CodeGen::run() {
                         break;
                     case Instruction::sitofp:
                         gen_sitofp();
+                        break;
+                    case Instruction::bitcast:
+                        gen_bitcast();
                         break;
                     }
                 }
