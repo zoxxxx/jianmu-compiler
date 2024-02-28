@@ -9,7 +9,7 @@
             "request": "launch",
             "name": "Debug",
             "program": "cminusfc",
-            "args": ["/home/zox/compiler/2023ustc-jianmu-compiler/tests/hidden_functional/16_k_smallest.sy", "-mem2reg", "-emit-llvm", "-o", "/home/zox/compiler/2023ustc-jianmu-compiler/tests/hidden_functional/16_k_smallest.ll"],
+            "args": ["/home/zox/compiler/2023ustc-jianmu-compiler/tests/performance/00_bitset1.sy", "-mem2reg", "-emit-llvm", "-o", "/home/zox/compiler/2023ustc-jianmu-compiler/tests/performance/00_bitset1.ll"],
             "cwd": "${workspaceFolder}/build",
         },
         {

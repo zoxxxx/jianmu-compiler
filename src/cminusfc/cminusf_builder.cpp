@@ -77,9 +77,8 @@ Constant *InitValCalc::get_const_value(Module *module) {
             return ConstantInt::get(
                 (int)(dynamic_cast<ConstantFP *>(single_val)->get_value()),
                 module);
-            }
-        else if (dynamic_cast<ConstantFP *>(single_val) == nullptr &&
-                 type->is_float_type())
+        } else if (dynamic_cast<ConstantFP *>(single_val) == nullptr &&
+                   type->is_float_type())
             return ConstantFP::get(
                 (float)(dynamic_cast<ConstantInt *>(single_val)->get_value()),
                 module);
@@ -591,7 +590,7 @@ Value *CminusfBuilder::visit(ASTLVal &node) {
     }
     auto res_type = ptr->get_type()->get_pointer_element_type();
     unsigned int dim = 0;
-    if(res_type->is_pointer_type()) {
+    if (res_type->is_pointer_type()) {
         res_type = res_type->get_pointer_element_type();
         dim = 1;
     }
@@ -685,7 +684,7 @@ Value *CminusfBuilder::visit(ASTBinaryExp &node) {
 
         auto lhs_ret = node.lhs->accept(*this);
         if (lhs_ret != nullptr) {
-            if(lhs_ret->get_type()->is_float_type()) {
+            if (lhs_ret->get_type()->is_float_type()) {
                 lhs_ret = builder->create_fcmp_ne(lhs_ret, CONST_FP(0.));
             } else if (lhs_ret->get_type()->is_int32_type())
                 lhs_ret = builder->create_icmp_ne(lhs_ret, CONST_INT(0));
@@ -696,7 +695,7 @@ Value *CminusfBuilder::visit(ASTBinaryExp &node) {
         context.falseBB = old_falseBB;
         auto rhs_ret = node.rhs->accept(*this);
         if (rhs_ret != nullptr) {
-            if(rhs_ret->get_type()->is_float_type()) {
+            if (rhs_ret->get_type()->is_float_type()) {
                 rhs_ret = builder->create_fcmp_ne(rhs_ret, CONST_FP(0.));
             } else if (rhs_ret->get_type()->is_int32_type())
                 rhs_ret = builder->create_icmp_ne(rhs_ret, CONST_INT(0));

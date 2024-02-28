@@ -129,13 +129,13 @@ class CminusfBuilder : public ASTVisitor {
         auto *putfarray_fun =
             Function::create(putfarray_type, "putfarray", module.get());
 
-        auto *starttime_type = FunctionType::get(TyVoid, {});
+        auto *starttime_type = FunctionType::get(TyVoid, {TyInt32});
         auto *starttime_fun =
-            Function::create(starttime_type, "starttime", module.get());
+            Function::create(starttime_type, "_sysy_starttime", module.get());
 
-        auto *stoptime_type = FunctionType::get(TyVoid, {});
+        auto *stoptime_type = FunctionType::get(TyVoid, {TyInt32});
         auto *stoptime_fun =
-            Function::create(stoptime_type, "stoptime", module.get());
+            Function::create(stoptime_type, "_sysy_stoptime", module.get());
 
         scope.enter();
         scope.push("getint", getint_fun);
@@ -148,8 +148,8 @@ class CminusfBuilder : public ASTVisitor {
         scope.push("putfloat", putfloat_fun);
         scope.push("putarray", putarray_fun);
         scope.push("putfarray", putfarray_fun);
-        scope.push("starttime", starttime_fun);
-        scope.push("stoptime", stoptime_fun);
+        scope.push("_sysy_starttime", starttime_fun);
+        scope.push("_sysy_stoptime", stoptime_fun);
 
         const_scope.enter();
     }

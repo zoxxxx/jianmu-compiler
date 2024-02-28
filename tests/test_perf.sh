@@ -3,7 +3,7 @@
 project_dir=$(realpath ../)
 sylib_dir=$(realpath "$project_dir"/src/sylib)
 output_dir=output
-suffix=cminus
+suffix=sy
 
 LOG=log.txt
 
@@ -20,7 +20,7 @@ check_return_value() {
     fi
 }
 
-test_dir=./performance-cases
+test_dir=./performance
 testcases=$(ls "$test_dir"/*."$suffix" | sort -V)
 check_return_value $? 0 "PATH" "unable to access to '$test_dir'" || exit 1
 

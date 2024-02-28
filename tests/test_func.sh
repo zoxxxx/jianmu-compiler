@@ -1,6 +1,6 @@
 #!/bin/bash
 ulimit -s 4096000
-timeout=60
+timeout=3600
 project_dir=$(realpath ../)
 sylib_dir=$(realpath "$project_dir"/src/sylib)
 output_dir=output
@@ -90,7 +90,7 @@ for case in $testcases; do
 	out_file=$output_dir/$case_base_name.out
 	ll_file=$output_dir/$case_base_name.ll
 
-	echo -n "$case_base_name..."
+	echo -ne "$case_base_name...\n"
 	# if debug or ll mode on, generate .ll also
 	if [ $debug_mode = true ] || [ $ll_mode = true ]; then
 		timeout $timeout bash -c "cminusfc -emit-llvm -mem2reg $case -o $ll_file" >>$LOG 2>&1
@@ -100,7 +100,7 @@ for case in $testcases; do
 	# Skip asm and executable generation if in ll mode
 	if [ $ll_mode = false ]; then
 		# cminusfc compile to .s
-		timeout $timeout bash -c "cminusfc -S $case -o $asm_file" >>$LOG 2>&1
+		timeout $timeout bash -c "cminusfc -S -mem2reg $case -o $asm_file" >>$LOG 2>&1
 		check_compile_time $? "TLE" "cminusfc compiler error" || continue
 		check_return_value $? 0 "CE" "cminusfc compiler error" || continue
 

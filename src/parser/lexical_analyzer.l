@@ -14,7 +14,14 @@ int pos_end = 1;
 void pass_node(char *text){
      yylval.node = new_syntax_tree_node(text);
 }
-
+static void yyunput ( int c, char *buf_ptr  );
+void unput_str(char *str){
+     int len = strlen(str);
+     while(len > 0){
+          len --;
+          unput(str[len]);
+     }
+}
 /*****************声明和选项设置  end*****************/
 
 %}
@@ -34,6 +41,10 @@ hex_fraction   ({hexdigit}*\.{hexdigit}+|{hexdigit}+\.)
 
 %x comment
 %%
+
+__LINE__       { char s[10]; sprintf(s, "%d", lines); unput_str(s); }
+stoptime\(\)   { unput_str("_sysy_stoptime(__LINE__)"); }
+starttime\(\)  { unput_str("_sysy_starttime(__LINE__)"); }
 
 \+ 	{pos_start = pos_end; pos_end ++; pass_node(yytext); return ADD;}
 -    {pos_start = pos_end; pos_end ++; pass_node(yytext); return SUB;}
