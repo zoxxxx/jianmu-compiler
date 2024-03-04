@@ -100,8 +100,8 @@ for case in $testcases; do
 	# Skip asm and executable generation if in ll mode
 	if [ $ll_mode = false ]; then
 		# cminusfc compile to .s
-		# timeout $timeout bash -c "cminusfc -S -mem2reg $case -o $asm_file" >>$LOG 2>&1
-		timeout $timeout bash -c "cminusfc -S $case -o $asm_file" >>$LOG 2>&1
+		timeout $timeout bash -c "cminusfc -S -mem2reg $case -o $asm_file" >>$LOG 2>&1
+		# timeout $timeout bash -c "cminusfc -S $case -o $asm_file" >>$LOG 2>&1
 		check_compile_time $? "TLE" "cminusfc compiler error" || continue
 		check_return_value $? 0 "CE" "cminusfc compiler error" || continue
 
