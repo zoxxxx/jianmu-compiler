@@ -1,18 +1,22 @@
+#pragma once
+#include "MachineBasicBlock.hpp"
 #include <cassert>
-#include <functional> // 用于std::function
+#include <functional>
 #include <memory>
+#include <string>
 #include <utility>
 
 class VirtualRegister;
 class PhysicalRegister;
-
+class MachineBasicBlock;
 class Operand {
   public:
     Operand() = default;
     virtual ~Operand() = default;
     virtual bool is_reg() const { return false; }
     virtual bool is_imm() const { return false; }
-    virtual bool is_mem() const { return false; }
+    virtual bool is_label() const { return false; }
+    std::string print() const;
 };
 
 class Register : public Operand {
@@ -24,7 +28,6 @@ class Register : public Operand {
     virtual bool is_virtual_reg() const { return false; }
     virtual bool is_physical_reg() const { return false; }
     RegisterType get_type() const { return type; }
-
   protected:
     RegisterType type;
 };
@@ -95,6 +98,7 @@ class VirtualRegister : public Register {
     virtual ~VirtualRegister() = default;
     bool is_virtual_reg() const override final { return true; }
     unsigned get_ID() const { return id; }
+    RegisterType get_type() const { return type; }
     static std::shared_ptr<VirtualRegister> create(RegisterType type) {
         return RegisterFactory::get_instance().get_new_virtual_reg(type);
     }
@@ -104,14 +108,19 @@ class VirtualRegister : public Register {
 
   private:
     unsigned id;
+    RegisterType type;
 };
 
 class PhysicalRegister : public Register {
   public:
     PhysicalRegister() = default;
     virtual ~PhysicalRegister() = default;
+    PhysicalRegister(unsigned id, RegisterType type) : id(id) {
+        this->type = type;
+    }
     bool is_physical_reg() const override final { return true; }
-
+    unsigned get_ID() const { return id; }
+    RegisterType get_type() const { return type; }
     static std::shared_ptr<PhysicalRegister> zero() {
         return RegisterFactory::get_instance().get_register(
             RegisterType::General, 0);
@@ -182,17 +191,30 @@ class PhysicalRegister : public Register {
     }
 
   private:
+    unsigned id;
+    RegisterType type;
 };
 
 class Immediate : public Operand {
   public:
-    bool is_imm() const override final{ return true; }
-    bool is_imm12() const { return value >= -2048 && value <= 2047; }
+    bool is_imm_length(int bits) const {
+        assert(bits <= 32 && bits > 0);
+        return value >= -(1ll << (bits - 1)) && value <= (1ll << (bits - 1)) - 1;
+    }
+
+    bool is_uimm_length(int bits) const {
+        assert(bits <= 32 && bits > 0);
+        return value >= 0 && value <= (1ll << bits) - 1;
+    }
+
   private:
     int value;
 };
 
-class Memory : public Operand {
+class Label : public Operand {
   public:
-    bool isMem() const { return true; }
+    bool is_label() const override final { return true; }
+
+  private:
+    std::weak_ptr<MachineBasicBlock> block;
 };

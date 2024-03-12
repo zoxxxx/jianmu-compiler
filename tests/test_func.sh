@@ -89,18 +89,25 @@ for case in $testcases; do
 	exe_file=$output_dir/$case_base_name
 	out_file=$output_dir/$case_base_name.out
 	ll_file=$output_dir/$case_base_name.ll
+	c_file=$output_dir/$case_base_name.c
+
+	cp $case $c_file
+
+	sed -i '1i #include "/home/zox/compiler/2023ustc-jianmu-compiler/src/sylib/sylib.h"' $c_file
 
 	echo -ne "$case_base_name...\n"
 	# if debug or ll mode on, generate .ll also
 	if [ $debug_mode = true ] || [ $ll_mode = true ]; then
 		timeout $timeout bash -c "cminusfc -emit-llvm -mem2reg $case -o $ll_file" >>$LOG 2>&1
+		# timeout $timeout bash -c "clang -S -emit-llvm -O3 -D 'starttime()=_sysy_starttime(__LINE__)' -D 'stoptime()=_sysy_stoptime(__LINE__)' $c_file -o $ll_file" >>$LOG 2>&1
 		check_compile_time $? "TLE" "cminusfc compiler error" || continue
 	fi
 
 	# Skip asm and executable generation if in ll mode
 	if [ $ll_mode = false ]; then
 		# cminusfc compile to .s
-		timeout $timeout bash -c "cminusfc -S -mem2reg $case -o $asm_file" >>$LOG 2>&1
+		# timeout $timeout bash -c "cminusfc -S -mem2reg $case -o $asm_file" >>$LOG 2>&1
+		timeout $timeout bash -c "loongarch64-unknown-linux-gnu-g++ -S -c -static $c_file -o $asm_file" >>$LOG 2>&1
 		# timeout $timeout bash -c "cminusfc -S $case -o $asm_file" >>$LOG 2>&1
 		check_compile_time $? "TLE" "cminusfc compiler error" || continue
 		check_return_value $? 0 "CE" "cminusfc compiler error" || continue
@@ -123,7 +130,7 @@ for case in $testcases; do
 		check_compile_time $? "TLE" "llc compiler error" || continue
 		check_return_value $? 0 "CE" "llc compiler error" || continue
 
-		timeout $timeout clang "$output_dir/$case_base_name.o" -o "$exe_file" -lsylib>>$LOG 2>&1
+		timeout $timeout clang -static "$output_dir/$case_base_name.o" -o "$exe_file" -lsylib>>$LOG 2>&1
 		check_compile_time $? "TLE" "clang linker error" || continue
 		check_return_value $? 0 "CE" "clang linker error" || continue
 

@@ -1,0 +1,60 @@
+digraph llvm_transformation {
+    bgcolor=transparent;
+    compound=true; // 允许跨子图的边
+    node [shape=box];
+    rankdir=LR; 
+    newrank=true; // 使用新的排列引擎
+    subgraph cluster_0 {
+        label="原始结构";
+        color=blue;
+        Sysy [label="Sysy", shape=ellipse]
+        FrontEnd [label="FrontEnd"];
+        LLVM_IR [label="LLVM IR", shape=ellipse];
+        IRPasses [label="IR passes", shape=ellipse];
+        BackEnd [label="CodeGen"];
+        TargetCode [label="Loongarch asm", shape=ellipse];
+
+        Sysy -> FrontEnd;
+        FrontEnd -> LLVM_IR;
+        LLVM_IR -> IRPasses;
+        IRPasses -> LLVM_IR;
+        LLVM_IR -> BackEnd;
+        BackEnd -> TargetCode;
+    }
+
+    subgraph cluster_1 {
+        label="引入MIR的结构";
+        color=red;
+
+        SysyNew [label="Sysy", shape=ellipse];
+        FrontEndNew [label="FrontEnd"];
+        LLVM_IRNew [label="LLVM IR", shape=ellipse];
+        IRPassesNew [label="IR passes", shape=ellipse];
+        InstructionSelection [label="Instruction\n Selection"];
+        MIR [label="MIR", shape=ellipse];
+        MIROpt [label="Register Allocation\n SSA Deconstruction\n Optimization"];
+        CodeEmission [label="Code Emission"];
+        TargetCodeNew [label="Loongarch asm", shape=ellipse];
+
+        SysyNew -> FrontEndNew;
+        FrontEndNew -> LLVM_IRNew;
+        LLVM_IRNew -> IRPassesNew;
+        IRPassesNew -> LLVM_IRNew;
+        LLVM_IRNew -> InstructionSelection;
+        InstructionSelection -> MIR;
+        MIR -> MIROpt
+        MIROpt -> MIR;
+        MIR -> CodeEmission;
+        CodeEmission -> TargetCodeNew;
+        MIRComment [shape=note, label="MIR: 机器中间表示，使用虚拟寄存器或者物理寄存器", style=dashed];
+        MIR -> MIRComment [style=dashed, arrowhead=none];
+    }
+
+    InvisibleNode [style=invis];
+    LLVM_IR -> InvisibleNode [style=invis, len=3]; // 增加len属性以增加距离
+    InvisibleNode -> LLVM_IRNew [style=invis, len=3];
+    {rank=same; Sysy; FrontEnd; LLVM_IR; BackEnd; TargetCode;}
+    {rank=same; SysyNew; FrontEndNew; LLVM_IRNew; InstructionSelection; MIR; CodeEmission; TargetCodeNew;}
+    // 使用lhead和ltail属性指定箭头连接的子图
+    LLVM_IR -> LLVM_IRNew [lhead=cluster_1, ltail=cluster_0, color="red", style="dashed", constraint=false];
+}
