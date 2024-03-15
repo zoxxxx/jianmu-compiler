@@ -7,8 +7,9 @@
 #include <string>
 #include <vector>
 
-class MachineBasicBlock;
 class Operand;
+class Register;
+class MachineBasicBlock;
 class MachineInstr : public std::enable_shared_from_this<MachineInstr> {
   public:
     enum class Suffix { BYTE, HALF, WORD, DWORD, NONE };
@@ -67,8 +68,11 @@ class MachineInstr : public std::enable_shared_from_this<MachineInstr> {
         FFINT_S_W,
         FTINTRZ_W_S,
         // float move operation
-        MOVGR2FR_S,
-        MOVFR2GR_W,
+        MOVGR2FR_W,
+        MOVFR2GR_S,
+        // floatcmp move operation
+        MOVGR2CF,
+        MOVCF2GR,
         // float load and store operation
         FLD_S,
         FST_S,
@@ -85,7 +89,7 @@ class MachineInstr : public std::enable_shared_from_this<MachineInstr> {
     
     bool has_dst() const;
     std::shared_ptr<Operand> get_operand(unsigned index) const; 
-    std::shared_ptr<Operand> get_dst() const ;
+    std::shared_ptr<Register> get_dst() const ;
 
     std::weak_ptr<MachineBasicBlock> get_parent() const { return parent; }
     void set_comment(const std::string &comment) { this->comment = comment; }

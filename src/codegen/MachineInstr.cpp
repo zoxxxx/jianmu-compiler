@@ -92,10 +92,14 @@ std::string get_tag_name(MachineInstr::Tag tag) {
         return "ffint.s.w";
     case MachineInstr::Tag::FTINTRZ_W_S:
         return "ftintrz.w.s";
-    case MachineInstr::Tag::MOVGR2FR_S:
+    case MachineInstr::Tag::MOVGR2FR_W:
         return "movgr2fr.s";
-    case MachineInstr::Tag::MOVFR2GR_W:
+    case MachineInstr::Tag::MOVFR2GR_S:
         return "movfr2gr.w";
+    case MachineInstr::Tag::MOVGR2CF:
+        return "movgr2cf";
+    case MachineInstr::Tag::MOVCF2GR:
+        return "movcf2gr";
     case MachineInstr::Tag::FLD_S:
         return "fld.s";
     case MachineInstr::Tag::FST_S:
@@ -112,8 +116,6 @@ std::string get_tag_name(MachineInstr::Tag tag) {
         return "bceqz";
     case MachineInstr::Tag::BCNEZ:
         return "bcnez";
-    default:
-        assert(false && "unknown tag");
     }
 }
 
@@ -166,7 +168,9 @@ std::shared_ptr<Operand> MachineInstr::get_operand(unsigned index) const {
     return operands[index];
 }
 
-std::shared_ptr<Operand> MachineInstr::get_dst() const {
-    assert(has_dst() && "Branch instruction has no destination operand!");
-    return get_operand(0);
+std::shared_ptr<Register> MachineInstr::get_dst() const {
+    assert(has_dst() && "Instruction has no destination operand!");
+    assert(std::dynamic_pointer_cast<Register>(operands[0]) != nullptr &&
+           "Destination operand is not a register!");
+    return std::dynamic_pointer_cast<Register>(operands[0]);
 }

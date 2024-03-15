@@ -4,9 +4,14 @@
 #include "Operand.hpp"
 #include "Type.hpp"
 #include <cassert>
+#include <initializer_list>
 #include <memory>
 #include <typeindex>
 #include <unordered_map>
+
+#define LOW_12_MASK 0x00000FFF
+#define LOW_20_MASK 0x000FFFFF
+#define LOW_32_MASK 0xFFFFFFFF
 class InstructionChecker {
   public:
     enum class OperandType { GENERAL, FLOAT, FLOATCMP, REGISTER, IMM, LABEL };
@@ -52,7 +57,19 @@ class MIBuilder {
   private:
   public:
     std::shared_ptr<MachineInstr>
-    gen_instr(std::shared_ptr<MachineBasicBlock>, MachineInstr::Tag tag,
-              std::vector<std::shared_ptr<Operand>> operands,
+    gen_instr(std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
+              std::initializer_list<std::shared_ptr<Operand>> operands,
               MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
+    std::shared_ptr<MachineInstr>
+    insert_instr(std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
+                 std::initializer_list<std::shared_ptr<Operand>> operands,
+                 std::vector<std::shared_ptr<MachineInstr>>::iterator it,
+                 MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
+    void load_large_int32(std::shared_ptr<MachineBasicBlock> mbb, int32_t val,
+                          std::shared_ptr<Register> reg);
+    void load_large_int64(std::shared_ptr<MachineBasicBlock> mbb, int64_t val,
+                          std::shared_ptr<Register> reg);
+    void add_int_to_reg(std::shared_ptr<MachineBasicBlock> mbb,
+                        std::shared_ptr<Register> dst,
+                        std::shared_ptr<Register> src, int64_t imm);
 };

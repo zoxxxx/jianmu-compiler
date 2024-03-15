@@ -1,22 +1,82 @@
 #include "Instruction.hpp"
-#include "MIbuilder.hpp"
+#include "MIBuilder.hpp"
 #include "MachineBasicBlock.hpp"
 #include "MachineInstr.hpp"
 #include "Operand.hpp"
 #include "syntax_analyzer.h"
 #include <cassert>
+#include <cstdint>
+#include <initializer_list>
+#include <iterator>
 #include <memory>
 
 std::shared_ptr<MachineInstr>
 MIBuilder::gen_instr(std::shared_ptr<MachineBasicBlock> mbb,
                      MachineInstr::Tag tag,
-                     std::vector<std::shared_ptr<Operand>> operands,
+                     std::initializer_list<std::shared_ptr<Operand>> operands,
                      MachineInstr::Suffix suffix) {
     assert(InstructionChecker::get_instance().check(tag, operands, suffix));
     std::shared_ptr<MachineInstr> instr =
         std::make_shared<MachineInstr>(tag, operands, suffix);
     mbb->append_instr(instr);
     return instr;
+}
+
+std::shared_ptr<MachineInstr> MIBuilder::insert_instr(
+    std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
+    std::initializer_list<std::shared_ptr<Operand>> operands,
+    std::vector<std::shared_ptr<MachineInstr>>::iterator it,
+    MachineInstr::Suffix suffix) {
+    assert(InstructionChecker::get_instance().check(tag, operands, suffix));
+    std::shared_ptr<MachineInstr> instr =
+        std::make_shared<MachineInstr>(tag, operands, suffix);
+    mbb->insert_instr(instr, it);
+    return instr;
+}
+
+void MIBuilder::load_large_int32(std::shared_ptr<MachineBasicBlock> mbb,
+                                 int32_t val, std::shared_ptr<Register> reg) {
+    int32_t high_20 = val >> 12; // si20
+    uint32_t low_12 = val & LOW_12_MASK;
+    auto tmp_reg = VirtualRegister::create(Register::General);
+    gen_instr(mbb, MachineInstr::Tag::LU12I_W,
+              {tmp_reg, std::make_shared<Immediate>(high_20)});
+    gen_instr(mbb, MachineInstr::Tag::ORI,
+              {reg, tmp_reg, std::make_shared<Immediate>(low_12)});
+}
+
+void MIBuilder::load_large_int64(std::shared_ptr<MachineBasicBlock> mbb,
+                                 int64_t val, std::shared_ptr<Register> reg) {
+    auto low_32 = static_cast<int32_t>(val & LOW_32_MASK);
+
+    auto tmp_reg1 = VirtualRegister::create(Register::General);
+    load_large_int32(mbb, low_32, tmp_reg1);
+
+    auto high_32 = static_cast<int32_t>(val >> 32);
+    int32_t high_32_low_20 = (high_32 << 12) >> 12; // si20
+    int32_t high_32_high_12 = high_32 >> 20;        // si12
+
+    auto tmp_reg2 = VirtualRegister::create(Register::General);
+    gen_instr(mbb, MachineInstr::Tag::LU32I_D,
+              {tmp_reg2, std::make_shared<Immediate>(high_32_low_20)});
+    gen_instr(mbb, MachineInstr::Tag::LU52I_D,
+              {reg, tmp_reg2, std::make_shared<Immediate>(high_32_high_12)});
+}
+
+void MIBuilder::add_int_to_reg(std::shared_ptr<MachineBasicBlock> mbb,
+                               std::shared_ptr<Register> dst,
+                               std::shared_ptr<Register> src, int64_t val) {
+    auto imm = std::make_shared<Immediate>(val);
+    if (imm->is_imm_length(12))
+        gen_instr(mbb, MachineInstr::Tag::ADDI, {dst, src, imm});
+    else {
+        auto tmp_reg = VirtualRegister::create(Register::General);
+        if (val <= INT32_MAX && val >= INT32_MIN)
+            load_large_int32(mbb, val, tmp_reg);
+        else
+            load_large_int64(mbb, val, tmp_reg);
+        gen_instr(mbb, MachineInstr::Tag::ADD, {dst, src, tmp_reg});
+    }
 }
 
 InstructionChecker::InstructionChecker() {
@@ -115,10 +175,14 @@ InstructionChecker::InstructionChecker() {
         InstructionRequirement(2, {FLOAT, FLOAT});
     requirements[MachineInstr::Tag::FTINTRZ_W_S] =
         InstructionRequirement(2, {FLOAT, FLOAT});
-    requirements[MachineInstr::Tag::MOVGR2FR_S] =
+    requirements[MachineInstr::Tag::MOVGR2FR_W] =
         InstructionRequirement(2, {FLOAT, GENERAL});
-    requirements[MachineInstr::Tag::MOVFR2GR_W] =
+    requirements[MachineInstr::Tag::MOVFR2GR_S] =
         InstructionRequirement(2, {GENERAL, FLOAT});
+    requirements[MachineInstr::Tag::MOVCF2GR] =
+        InstructionRequirement(2, {GENERAL, FLOATCMP});
+    requirements[MachineInstr::Tag::MOVGR2CF] =
+        InstructionRequirement(2, {FLOATCMP, GENERAL});
     requirements[MachineInstr::Tag::FLD_S] =
         InstructionRequirement(3, {FLOAT, GENERAL, IMM}, 12, true);
     requirements[MachineInstr::Tag::FST_S] =

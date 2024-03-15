@@ -28,6 +28,7 @@ class Register : public Operand {
     virtual bool is_virtual_reg() const { return false; }
     virtual bool is_physical_reg() const { return false; }
     RegisterType get_type() const { return type; }
+
   protected:
     RegisterType type;
 };
@@ -197,9 +198,11 @@ class PhysicalRegister : public Register {
 
 class Immediate : public Operand {
   public:
+    Immediate(int value) : value(value) {}
     bool is_imm_length(int bits) const {
         assert(bits <= 32 && bits > 0);
-        return value >= -(1ll << (bits - 1)) && value <= (1ll << (bits - 1)) - 1;
+        return value >= -(1ll << (bits - 1)) &&
+               value <= (1ll << (bits - 1)) - 1;
     }
 
     bool is_uimm_length(int bits) const {
@@ -213,7 +216,14 @@ class Immediate : public Operand {
 
 class Label : public Operand {
   public:
+    Label(std::weak_ptr<MachineBasicBlock> block) : block(block) {}
     bool is_label() const override final { return true; }
+    std::string print() {
+        if (auto blk = block.lock()) {
+            return blk->get_name();
+        }
+        else assert(false && "block is expired");
+    }
 
   private:
     std::weak_ptr<MachineBasicBlock> block;
