@@ -80,6 +80,8 @@ std::string get_tag_name(MachineInstr::Tag tag) {
         return "st";
     case MachineInstr::Tag::JR:
         return "jr";
+    case MachineInstr::Tag::LA_LOCAL:
+        return "la.local";
     case MachineInstr::Tag::FADD_S:
         return "fadd.s";
     case MachineInstr::Tag::FSUB_S:

@@ -1,6 +1,7 @@
 #include "Instruction.hpp"
 #include "MachineBasicBlock.hpp"
 #include "MachineInstr.hpp"
+#include "MachineModule.hpp"
 #include "Operand.hpp"
 #include "Type.hpp"
 #include <cassert>
@@ -57,7 +58,7 @@ class MIBuilder {
   private:
   public:
     std::shared_ptr<MachineInstr>
-    gen_instr(std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
+    append_instr(std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
               std::initializer_list<std::shared_ptr<Operand>> operands,
               MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
     std::shared_ptr<MachineInstr>
@@ -65,6 +66,10 @@ class MIBuilder {
                  std::initializer_list<std::shared_ptr<Operand>> operands,
                  std::vector<std::shared_ptr<MachineInstr>>::iterator it,
                  MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
+    std::shared_ptr<MachineInstr> insert_instr_before_b(
+        std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
+        std::initializer_list<std::shared_ptr<Operand>> operands,
+        MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
     void load_large_int32(std::shared_ptr<MachineBasicBlock> mbb, int32_t val,
                           std::shared_ptr<Register> reg);
     void load_large_int64(std::shared_ptr<MachineBasicBlock> mbb, int64_t val,
@@ -72,4 +77,15 @@ class MIBuilder {
     void add_int_to_reg(std::shared_ptr<MachineBasicBlock> mbb,
                         std::shared_ptr<Register> dst,
                         std::shared_ptr<Register> src, int64_t imm);
+    void store_to_stack(
+        std::shared_ptr<MachineBasicBlock> mbb, std::shared_ptr<Register> reg,
+        std::shared_ptr<Register> ptr, int offset,
+        MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
+    void load_from_stack(
+        std::shared_ptr<MachineBasicBlock> mbb, std::shared_ptr<Register> reg,
+        std::shared_ptr<Register> ptr, int offset,
+        MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
+    
+    void gen_prologue_epilogue(std::shared_ptr<MachineFunction> MF);
+    void gen_allocate(std::shared_ptr<MachineFunction> MF);
 };

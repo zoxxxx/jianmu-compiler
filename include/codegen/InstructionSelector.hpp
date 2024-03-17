@@ -17,6 +17,8 @@ class InstructionSelector : public MachinePass {
   private:
     void gen_inst();
 
+    void gen_store_params();
+
     void gen_ret();
     void gen_br();
     void gen_binary();

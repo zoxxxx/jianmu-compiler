@@ -26,13 +26,16 @@ public:
     void append_instr(std::shared_ptr<MachineInstr> instr) {
         instrs.push_back(instr);
     }
+    void clear_instrs() {
+        instrs.clear();
+    }
     void add_succ_basic_block(std::shared_ptr<MachineBasicBlock> succ) {
         succs.push_back(succ);
     }
     void add_pre_basic_block(std::shared_ptr<MachineBasicBlock> pred) {
         preds.push_back(pred);
     }
-    std::vector<std::shared_ptr<MachineInstr>> get_instrs() const {
+    std::vector<std::shared_ptr<MachineInstr>> &get_instrs() {
         return instrs;
     }
     BasicBlock *get_IR_basic_block() const {

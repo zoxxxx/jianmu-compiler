@@ -7,50 +7,65 @@
 #include "Operand.hpp"
 #include "Value.hpp"
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 class FrameScheduler;
 class MachineModule;
 class MachineBasicBlock;
+class PhysicalRegister;
 class MachineFunction : public std::enable_shared_from_this<MachineFunction> {
   public:
     MachineFunction(Function *function, std::weak_ptr<MachineModule> parent)
         : function(function), parent(parent) {
         frame_scheduler = std::make_unique<FrameScheduler>();
+        calc_params_schedule();
     }
     ~MachineFunction() = default;
     void add_basic_block(std::shared_ptr<MachineBasicBlock> bb) {
         basic_blocks.push_back(bb);
     }
-    void set_entry_block(std::shared_ptr<MachineBasicBlock> bb) {
-        entry_block = bb;
+    void set_prologue_block(std::shared_ptr<MachineBasicBlock> bb) {
+        prologue_block = bb;
     }
-    void set_exit_block(std::shared_ptr<MachineBasicBlock> bb) {
-        exit_block = bb;
+    void set_epilogue_block(std::shared_ptr<MachineBasicBlock> bb) {
+        epilogue_block = bb;
     }
-    std::shared_ptr<MachineBasicBlock> get_entry_block() const {
-        return entry_block;
+    std::shared_ptr<MachineBasicBlock> get_prologue_block() const {
+        return prologue_block;
     }
-    std::shared_ptr<MachineBasicBlock> get_exit_block() const {
-        return exit_block;
+    std::shared_ptr<MachineBasicBlock> get_epilogue_block() const {
+        return epilogue_block;
     }
+    Function *get_IR_function() const { return function; }
+
+    virtual void calc_params_schedule();
     virtual void print() const;
     virtual std::string get_name() const;
     virtual std::vector<std::shared_ptr<MachineBasicBlock>>
     get_basic_blocks() const;
-    std::unique_ptr<FrameScheduler> frame_scheduler;
 
+    std::unique_ptr<FrameScheduler> frame_scheduler;
+    struct params_schedule {
+        // on stack or in register
+        bool on_stack;
+        // offset in stack or register
+        int offset;
+        std::shared_ptr<PhysicalRegister> reg;
+    } ;
+    std::unordered_map<Value *, params_schedule> params_schedule_map;
+    int params_size = 0;
   private:
     Function *function;
     std::weak_ptr<MachineModule> parent;
     std::vector<std::shared_ptr<MachineBasicBlock>> basic_blocks;
-    std::shared_ptr<MachineBasicBlock> entry_block;
-    std::shared_ptr<MachineBasicBlock> exit_block;
+    std::shared_ptr<MachineBasicBlock> prologue_block;
+    std::shared_ptr<MachineBasicBlock> epilogue_block;
 };
 
 class FrameScheduler {
   public:
-    void insert_alloca(Value *val) {
+    int insert_alloca(Value *val) {
         auto alloca_inst = static_cast<AllocaInst *>(val);
         frame_size =
             align(frame_size + alloca_inst->get_alloca_type()->get_size(), 16);
@@ -72,6 +87,6 @@ class FrameScheduler {
         return ((size + (alignment - 1)) & ~(alignment - 1));
     }
     int frame_size = 0;
-    std::map<Value *, int> alloca_map;
-    std::map<std::shared_ptr<Register>, int> reg_map;
+    std::unordered_map<Value *, int> alloca_map;
+    std::unordered_map<std::shared_ptr<Register>, int> reg_map;
 };

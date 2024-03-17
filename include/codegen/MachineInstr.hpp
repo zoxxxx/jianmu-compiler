@@ -59,6 +59,7 @@ class MachineInstr : public std::enable_shared_from_this<MachineInstr> {
         ST,
         // macro operation
         JR,
+        LA_LOCAL,
         // float arithmetical operation
         FADD_S,
         FSUB_S,

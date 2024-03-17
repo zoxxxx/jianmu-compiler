@@ -10,11 +10,10 @@
 #include <iterator>
 #include <memory>
 
-std::shared_ptr<MachineInstr>
-MIBuilder::gen_instr(std::shared_ptr<MachineBasicBlock> mbb,
-                     MachineInstr::Tag tag,
-                     std::initializer_list<std::shared_ptr<Operand>> operands,
-                     MachineInstr::Suffix suffix) {
+std::shared_ptr<MachineInstr> MIBuilder::append_instr(
+    std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
+    std::initializer_list<std::shared_ptr<Operand>> operands,
+    MachineInstr::Suffix suffix) {
     assert(InstructionChecker::get_instance().check(tag, operands, suffix));
     std::shared_ptr<MachineInstr> instr =
         std::make_shared<MachineInstr>(tag, operands, suffix);
@@ -34,15 +33,36 @@ std::shared_ptr<MachineInstr> MIBuilder::insert_instr(
     return instr;
 }
 
+std::shared_ptr<MachineInstr> insert_instr_before_b(
+    std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
+    std::initializer_list<std::shared_ptr<Operand>> operands,
+    MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE) {
+    assert(InstructionChecker::get_instance().check(tag, operands, suffix));
+    std::shared_ptr<MachineInstr> instr =
+        std::make_shared<MachineInstr>(tag, operands, suffix);
+    auto it = mbb->get_instrs().rbegin();
+    while (it != mbb->get_instrs().rend() &&
+           ((*it)->get_tag() == MachineInstr::Tag::B ||
+            (*it)->get_tag() == MachineInstr::Tag::BNEZ)) {
+        ++it;
+    }
+
+    if (it != mbb->get_instrs().rend()) {
+        auto insert_pos = std::next(it).base();
+        mbb->insert_instr(instr, insert_pos);
+    }
+    return instr;
+}
+
 void MIBuilder::load_large_int32(std::shared_ptr<MachineBasicBlock> mbb,
                                  int32_t val, std::shared_ptr<Register> reg) {
     int32_t high_20 = val >> 12; // si20
     uint32_t low_12 = val & LOW_12_MASK;
     auto tmp_reg = VirtualRegister::create(Register::General);
-    gen_instr(mbb, MachineInstr::Tag::LU12I_W,
-              {tmp_reg, std::make_shared<Immediate>(high_20)});
-    gen_instr(mbb, MachineInstr::Tag::ORI,
-              {reg, tmp_reg, std::make_shared<Immediate>(low_12)});
+    append_instr(mbb, MachineInstr::Tag::LU12I_W,
+                 {tmp_reg, Immediate::create(high_20)});
+    append_instr(mbb, MachineInstr::Tag::ORI,
+                 {reg, tmp_reg, Immediate::create(low_12)});
 }
 
 void MIBuilder::load_large_int64(std::shared_ptr<MachineBasicBlock> mbb,
@@ -57,26 +77,101 @@ void MIBuilder::load_large_int64(std::shared_ptr<MachineBasicBlock> mbb,
     int32_t high_32_high_12 = high_32 >> 20;        // si12
 
     auto tmp_reg2 = VirtualRegister::create(Register::General);
-    gen_instr(mbb, MachineInstr::Tag::LU32I_D,
-              {tmp_reg2, std::make_shared<Immediate>(high_32_low_20)});
-    gen_instr(mbb, MachineInstr::Tag::LU52I_D,
-              {reg, tmp_reg2, std::make_shared<Immediate>(high_32_high_12)});
+    append_instr(mbb, MachineInstr::Tag::LU32I_D,
+                 {tmp_reg2, Immediate::create(high_32_low_20)});
+    append_instr(mbb, MachineInstr::Tag::LU52I_D,
+                 {reg, tmp_reg2, Immediate::create(high_32_high_12)});
 }
 
 void MIBuilder::add_int_to_reg(std::shared_ptr<MachineBasicBlock> mbb,
                                std::shared_ptr<Register> dst,
                                std::shared_ptr<Register> src, int64_t val) {
-    auto imm = std::make_shared<Immediate>(val);
+    if (src == dst && val == 0) {
+        return;
+    }
+    auto imm = Immediate::create(val);
     if (imm->is_imm_length(12))
-        gen_instr(mbb, MachineInstr::Tag::ADDI, {dst, src, imm});
+        append_instr(mbb, MachineInstr::Tag::ADDI, {dst, src, imm});
     else {
         auto tmp_reg = VirtualRegister::create(Register::General);
         if (val <= INT32_MAX && val >= INT32_MIN)
             load_large_int32(mbb, val, tmp_reg);
         else
             load_large_int64(mbb, val, tmp_reg);
-        gen_instr(mbb, MachineInstr::Tag::ADD, {dst, src, tmp_reg});
+        append_instr(mbb, MachineInstr::Tag::ADD, {dst, src, tmp_reg});
     }
+}
+
+void MIBuilder::store_to_stack(std::shared_ptr<MachineBasicBlock> mbb,
+                               std::shared_ptr<Register> reg,
+                               std::shared_ptr<Register> ptr, int offset,
+                               MachineInstr::Suffix suffix) {
+
+    if (Immediate::create(offset)->is_imm_length(12)) {
+        if (reg->get_type() == Register::RegisterType::General)
+            append_instr(mbb, MachineInstr::Tag::ST,
+                         {reg, ptr, Immediate::create(offset)}, suffix);
+        else
+            append_instr(mbb, MachineInstr::Tag::FST_S,
+                         {reg, ptr, Immediate::create(offset)});
+    } else {
+        auto tmp_reg = VirtualRegister::create(Register::General);
+        load_large_int32(mbb, offset, tmp_reg);
+        append_instr(mbb, MachineInstr::Tag::ADD, {tmp_reg, ptr, tmp_reg},
+                     MachineInstr::Suffix::DWORD);
+        if (reg->get_type() == Register::RegisterType::General)
+            append_instr(mbb, MachineInstr::Tag::ST,
+                         {reg, tmp_reg, Immediate::create(0)}, suffix);
+        else
+            append_instr(mbb, MachineInstr::Tag::FST_S,
+                         {reg, tmp_reg, Immediate::create(0)});
+    }
+}
+
+void MIBuilder::load_from_stack(std::shared_ptr<MachineBasicBlock> mbb,
+                                std::shared_ptr<Register> reg,
+                                std::shared_ptr<Register> ptr, int offset,
+                                MachineInstr::Suffix suffix) {
+    if (Immediate::create(offset)->is_imm_length(12)) {
+        if (reg->get_type() == Register::RegisterType::General)
+            append_instr(mbb, MachineInstr::Tag::LD,
+                         {reg, ptr, Immediate::create(offset)}, suffix);
+        else
+            append_instr(mbb, MachineInstr::Tag::FLD_S,
+                         {reg, ptr, Immediate::create(offset)});
+    } else {
+        auto tmp_reg = VirtualRegister::create(Register::General);
+        load_large_int32(mbb, offset, tmp_reg);
+        append_instr(mbb, MachineInstr::Tag::ADD, {tmp_reg, ptr, tmp_reg},
+                     MachineInstr::Suffix::DWORD);
+        if (reg->get_type() == Register::RegisterType::General)
+            append_instr(mbb, MachineInstr::Tag::LD,
+                         {reg, tmp_reg, Immediate::create(0)}, suffix);
+        else
+            append_instr(mbb, MachineInstr::Tag::FLD_S,
+                         {reg, tmp_reg, Immediate::create(0)});
+    }
+}
+
+void MIBuilder::gen_prologue_epilogue(std::shared_ptr<MachineFunction> MF) {
+    auto prologue = MF->get_prologue_block();
+    auto epilogue = MF->get_epilogue_block();
+    prologue->clear_instrs();
+    epilogue->clear_instrs();
+    auto fp_st_reg = VirtualRegister::create(Register::General, Register::kUSING_SP_AS_FRAME_REG);
+    append_instr(prologue, MachineInstr::Tag::MOV, {fp_st_reg, PhysicalRegister::fp()});
+    append_instr(prologue, MachineInstr::Tag::MOV, {PhysicalRegister::fp(), PhysicalRegister::sp()});
+    add_int_to_reg(prologue, PhysicalRegister::sp(), PhysicalRegister::sp(), -MF->frame_scheduler->get_frame_size());
+    for (auto reg : PhysicalRegister::callee_saved_regs()){
+        auto tmp_reg = VirtualRegister::create(Register::General);
+        append_instr(prologue, MachineInstr::Tag::MOV, {tmp_reg, reg});
+        append_instr(epilogue, MachineInstr::Tag::MOV, {reg, tmp_reg});
+    }
+    append_instr(epilogue, MachineInstr::Tag::MOV, {PhysicalRegister::sp(), PhysicalRegister::fp()});
+    append_instr(epilogue, MachineInstr::Tag::MOV, {PhysicalRegister::fp(), fp_st_reg});
+
+    append_instr(prologue, MachineInstr::Tag::B, {std::make_shared<Label>(MF->get_name()+"_label_entry")});
+    append_instr(epilogue, MachineInstr::Tag::JR, {PhysicalRegister::ra()});
 }
 
 InstructionChecker::InstructionChecker() {
@@ -163,6 +258,8 @@ InstructionChecker::InstructionChecker() {
     requirements[MachineInstr::Tag::ST] = InstructionRequirement(
         3, {GENERAL, GENERAL, IMM}, 12, true, {BYTE, HALF, WORD, DWORD});
     requirements[MachineInstr::Tag::JR] = InstructionRequirement(1, {GENERAL});
+    requirements[MachineInstr::Tag::LA_LOCAL] =
+        InstructionRequirement(2, {GENERAL, LABEL});
     requirements[MachineInstr::Tag::FADD_S] =
         InstructionRequirement(3, {FLOAT, FLOAT, FLOAT});
     requirements[MachineInstr::Tag::FSUB_S] =

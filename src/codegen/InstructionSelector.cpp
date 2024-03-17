@@ -1,3 +1,4 @@
+#include "GlobalVariable.hpp"
 #include "Instruction.hpp"
 #include "InstructionSelector.hpp"
 #include "MachineInstr.hpp"
@@ -22,16 +23,18 @@ void InstructionSelector::run() {
             }
         }
 
-        machine_func->set_entry_block(
+        machine_func->set_prologue_block(
             std::make_shared<MachineBasicBlock>(nullptr, machine_func, ""));
-        machine_func->set_exit_block(std::make_shared<MachineBasicBlock>(
+        machine_func->set_epilogue_block(std::make_shared<MachineBasicBlock>(
             nullptr, machine_func, "_exit"));
     }
 
     // build CFG
     for (auto &func : IR_module->get_functions()) {
-        func_map[&func]->get_entry_block()->add_succ_basic_block(
-            bb_map[func.get_entry_block()]);
+        auto entry_mbb = bb_map[func.get_entry_block()];
+        func_map[&func]->get_prologue_block()->add_succ_basic_block(entry_mbb);
+        entry_mbb->add_pre_basic_block(func_map[&func]->get_prologue_block());
+
         for (auto &bb : func.get_basic_blocks()) {
             context.machine_bb = bb_map[&bb];
             for (auto &pred : bb.get_pre_basic_blocks()) {
@@ -43,7 +46,7 @@ void InstructionSelector::run() {
             if (bb.get_instructions().back().get_instr_type() ==
                 Instruction::ret) {
                 context.machine_bb->add_succ_basic_block(
-                    func_map[&func]->get_exit_block());
+                    func_map[&func]->get_epilogue_block());
             }
         }
     }
@@ -52,6 +55,8 @@ void InstructionSelector::run() {
     for (auto &machine_func : module->get_functions()) {
         context.clear();
         context.machine_func = machine_func;
+
+        gen_store_params();
         for (auto &bb : machine_func->get_basic_blocks()) {
             context.machine_bb = bb;
 
@@ -60,6 +65,48 @@ void InstructionSelector::run() {
                 gen_inst();
             }
         }
+        builder.gen_prologue_epilogue(machine_func);
+    }
+}
+
+void InstructionSelector::gen_store_params() {
+
+    auto entry_mbb =
+        bb_map[context.machine_func->get_IR_function()->get_entry_block()];
+    for (auto &arg : context.machine_func->get_IR_function()->get_args()) {
+        if (arg.get_type()->is_integer_type() ||
+            arg.get_type()->is_pointer_type()) {
+            auto tmp_reg = VirtualRegister::create(Register::General);
+            if (context.machine_func->params_schedule_map[&arg].on_stack) {
+                builder.load_from_stack(
+                    entry_mbb, tmp_reg, PhysicalRegister::fp(),
+                    context.machine_func->params_schedule_map[&arg].offset);
+                context.val_map[&arg] = tmp_reg;
+            } else {
+                auto tmp_reg = VirtualRegister::create(Register::General);
+                builder.append_instr(
+                    entry_mbb, MachineInstr::Tag::MOV,
+                    {tmp_reg,
+                     context.machine_func->params_schedule_map[&arg].reg});
+            }
+            context.val_map[&arg] = tmp_reg;
+        } else if (arg.get_type()->is_float_type()) {
+            auto tmp_freg = VirtualRegister::create(Register::Float);
+            if (context.machine_func->params_schedule_map[&arg].on_stack) {
+                builder.load_from_stack(
+                    entry_mbb, tmp_freg, PhysicalRegister::fp(),
+                    context.machine_func->params_schedule_map[&arg].offset);
+                context.val_map[&arg] = tmp_freg;
+            } else {
+                auto tmp_freg = VirtualRegister::create(Register::Float);
+                builder.append_instr(
+                    entry_mbb, MachineInstr::Tag::MOV,
+                    {tmp_freg,
+                     context.machine_func->params_schedule_map[&arg].reg});
+            }
+            context.val_map[&arg] = tmp_freg;
+        } else
+            assert(false);
     }
 }
 
@@ -68,21 +115,22 @@ void InstructionSelector::gen_ret() {
     if (retInst->get_num_operand() > 0) {
         auto *ret_val = retInst->get_operand(0);
         if (ret_val->get_type()->is_integer_type())
-            builder.gen_instr(
+            builder.append_instr(
                 context.machine_bb, MachineInstr::Tag::MOV,
                 {PhysicalRegister::a(0), context.val_map[ret_val]});
         else if (ret_val->get_type()->is_float_type())
-            builder.gen_instr(
+            builder.append_instr(
                 context.machine_bb, MachineInstr::Tag::MOV,
                 {PhysicalRegister::fa(0), context.val_map[ret_val]});
         else
             assert(false);
     } else
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::MOV,
-                          {PhysicalRegister::a(0), PhysicalRegister::zero()});
-    builder.gen_instr(
+        builder.append_instr(
+            context.machine_bb, MachineInstr::Tag::MOV,
+            {PhysicalRegister::a(0), PhysicalRegister::zero()});
+    builder.append_instr(
         context.machine_bb, MachineInstr::Tag::B,
-        {std::make_shared<Label>(context.machine_func->get_exit_block())});
+        {std::make_shared<Label>(context.machine_func->get_epilogue_block())});
 }
 
 void InstructionSelector::gen_br() {
@@ -93,15 +141,15 @@ void InstructionSelector::gen_br() {
         auto *falsebb = static_cast<BasicBlock *>(branchInst->get_operand(2));
 
         auto tmp_reg = VirtualRegister::create(Register::General);
-        builder.gen_instr(
+        builder.append_instr(
             context.machine_bb, MachineInstr::Tag::BNEZ,
             {context.val_map[cond], std::make_shared<Label>(bb_map[truebb])});
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::B,
-                          {std::make_shared<Label>(bb_map[falsebb])});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::B,
+                             {std::make_shared<Label>(bb_map[falsebb])});
     } else {
         auto *branchbb = static_cast<BasicBlock *>(branchInst->get_operand(0));
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::B,
-                          {std::make_shared<Label>(bb_map[branchbb])});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::B,
+                             {std::make_shared<Label>(bb_map[branchbb])});
     }
 }
 
@@ -113,29 +161,29 @@ void InstructionSelector::gen_binary() {
     auto tmp_reg = VirtualRegister::create(Register::General);
     switch (context.IR_inst->get_instr_type()) {
     case Instruction::add:
-        inst =
-            builder.gen_instr(context.machine_bb, MachineInstr::Tag::ADD,
-                              {tmp_reg, op1, op2}, MachineInstr::Suffix::WORD);
+        inst = builder.append_instr(context.machine_bb, MachineInstr::Tag::ADD,
+                                    {tmp_reg, op1, op2},
+                                    MachineInstr::Suffix::WORD);
         break;
     case Instruction::sub:
-        inst =
-            builder.gen_instr(context.machine_bb, MachineInstr::Tag::SUB,
-                              {tmp_reg, op1, op2}, MachineInstr::Suffix::WORD);
+        inst = builder.append_instr(context.machine_bb, MachineInstr::Tag::SUB,
+                                    {tmp_reg, op1, op2},
+                                    MachineInstr::Suffix::WORD);
         break;
     case Instruction::mul:
-        inst =
-            builder.gen_instr(context.machine_bb, MachineInstr::Tag::MUL,
-                              {tmp_reg, op1, op2}, MachineInstr::Suffix::WORD);
+        inst = builder.append_instr(context.machine_bb, MachineInstr::Tag::MUL,
+                                    {tmp_reg, op1, op2},
+                                    MachineInstr::Suffix::WORD);
         break;
     case Instruction::sdiv:
-        inst =
-            builder.gen_instr(context.machine_bb, MachineInstr::Tag::DIV,
-                              {tmp_reg, op1, op2}, MachineInstr::Suffix::WORD);
+        inst = builder.append_instr(context.machine_bb, MachineInstr::Tag::DIV,
+                                    {tmp_reg, op1, op2},
+                                    MachineInstr::Suffix::WORD);
         break;
     case Instruction::srem:
-        inst =
-            builder.gen_instr(context.machine_bb, MachineInstr::Tag::MOD,
-                              {tmp_reg, op1, op2}, MachineInstr::Suffix::WORD);
+        inst = builder.append_instr(context.machine_bb, MachineInstr::Tag::MOD,
+                                    {tmp_reg, op1, op2},
+                                    MachineInstr::Suffix::WORD);
         break;
     default:
         assert(false);
@@ -152,19 +200,23 @@ void InstructionSelector::gen_float_binary() {
     auto tmp_freg = VirtualRegister::create(Register::Float);
     switch (context.IR_inst->get_instr_type()) {
     case Instruction::fadd:
-        inst = builder.gen_instr(context.machine_bb, MachineInstr::Tag::FADD_S,
+        inst =
+            builder.append_instr(context.machine_bb, MachineInstr::Tag::FADD_S,
                                  {tmp_freg, op1, op2});
         break;
     case Instruction::fsub:
-        inst = builder.gen_instr(context.machine_bb, MachineInstr::Tag::FSUB_S,
+        inst =
+            builder.append_instr(context.machine_bb, MachineInstr::Tag::FSUB_S,
                                  {tmp_freg, op1, op2});
         break;
     case Instruction::fmul:
-        inst = builder.gen_instr(context.machine_bb, MachineInstr::Tag::FMUL_S,
+        inst =
+            builder.append_instr(context.machine_bb, MachineInstr::Tag::FMUL_S,
                                  {tmp_freg, op1, op2});
         break;
     case Instruction::fdiv:
-        inst = builder.gen_instr(context.machine_bb, MachineInstr::Tag::FDIV_S,
+        inst =
+            builder.append_instr(context.machine_bb, MachineInstr::Tag::FDIV_S,
                                  {tmp_freg, op1, op2});
         break;
     default:
@@ -176,38 +228,48 @@ void InstructionSelector::gen_float_binary() {
 
 void InstructionSelector::gen_alloca() {
     auto *allocaInst = static_cast<AllocaInst *>(context.IR_inst);
-    auto offset =
-        context.machine_func->frame_scheduler->get_alloca_offset(allocaInst);
+    context.machine_func->frame_scheduler->insert_alloca(allocaInst);
     auto tmp_reg = VirtualRegister::create(Register::General);
-    builder.add_int_to_reg(context.machine_bb, tmp_reg, PhysicalRegister::sp(),
-                           -offset);
+
+    builder.add_int_to_reg(
+        context.machine_bb, tmp_reg, PhysicalRegister::fp(),
+        -context.machine_func->frame_scheduler->get_alloca_offset(allocaInst));
     context.val_map[context.IR_inst] = tmp_reg;
 }
 
 void InstructionSelector::gen_load() {
     auto *ptr = context.IR_inst->get_operand(0);
     auto *type = context.IR_inst->get_type();
-
+    auto ld_pos = context.val_map[ptr];
+    if (dynamic_cast<GlobalVariable *>(ptr) != nullptr) {
+        auto tmp_reg = VirtualRegister::create(Register::General);
+        builder.append_instr(
+            context.machine_bb, MachineInstr::Tag::LA_LOCAL,
+            {tmp_reg, std::make_shared<Label>(ptr->get_name())});
+        ld_pos = tmp_reg;
+    }
     if (type->is_float_type()) {
         auto tmp_freg = VirtualRegister::create(Register::Float);
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::FLD_S,
-                          {tmp_freg, context.val_map[ptr]});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::FLD_S,
+                             {tmp_freg, ld_pos, Immediate::create(0)});
         context.val_map[context.IR_inst] = tmp_freg;
     } else {
         auto tmp_reg = VirtualRegister::create(Register::General);
         // load 整数类型的数据
         if (type->get_size() == 1)
-            builder.gen_instr(context.machine_bb, MachineInstr::Tag::LD,
-                              {tmp_reg, context.val_map[ptr], 0},
-                              MachineInstr::Suffix::BYTE);
+            builder.append_instr(context.machine_bb, MachineInstr::Tag::LD,
+                                 {tmp_reg, ld_pos, Immediate::create(0)},
+                                 MachineInstr::Suffix::BYTE);
         else if (type->get_size() == 4)
-            builder.gen_instr(context.machine_bb, MachineInstr::Tag::LD,
-                              {tmp_reg, context.val_map[ptr], 0},
-                              MachineInstr::Suffix::WORD);
+            builder.append_instr(
+                context.machine_bb, MachineInstr::Tag::LD,
+                {tmp_reg, context.val_map[ptr], Immediate::create(0)},
+                MachineInstr::Suffix::WORD);
         else if (type->get_size() == 8)
-            builder.gen_instr(context.machine_bb, MachineInstr::Tag::LD,
-                              {tmp_reg, context.val_map[ptr], 0},
-                              MachineInstr::Suffix::DWORD);
+            builder.append_instr(
+                context.machine_bb, MachineInstr::Tag::LD,
+                {tmp_reg, context.val_map[ptr], Immediate::create(0)},
+                MachineInstr::Suffix::DWORD);
         else
             assert(false);
         context.val_map[context.IR_inst] = tmp_reg;
@@ -215,32 +277,38 @@ void InstructionSelector::gen_load() {
 }
 
 void InstructionSelector::gen_store() {
-    // 翻译 store 指令
     auto *ptr = context.IR_inst->get_operand(1);
     auto *st_val = context.IR_inst->get_operand(0);
     auto *type = context.IR_inst->get_operand(0)->get_type();
+    auto st_pos = context.val_map[ptr];
+    if (dynamic_cast<GlobalVariable *>(ptr) != nullptr) {
+        auto tmp_reg = VirtualRegister::create(Register::General);
+        builder.append_instr(
+            context.machine_bb, MachineInstr::Tag::LA_LOCAL,
+            {tmp_reg, std::make_shared<Label>(ptr->get_name())});
+        st_pos = tmp_reg;
+    }
 
     if (type->is_float_type()) {
-        auto tmp_freg = VirtualRegister::create(Register::Float);
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::FST_S,
-                          {context.val_map[st_val], context.val_map[ptr],
-                           std::make_shared<Immediate>(0)});
+        builder.append_instr(
+            context.machine_bb, MachineInstr::Tag::FST_S,
+            {context.val_map[st_val], st_pos, Immediate::create(0)});
     } else {
         if (type->get_size() == 1)
-            builder.gen_instr(context.machine_bb, MachineInstr::Tag::ST,
-                              {context.val_map[st_val], context.val_map[ptr],
-                               std::make_shared<Immediate>(0)},
-                              MachineInstr::Suffix::BYTE);
+            builder.append_instr(
+                context.machine_bb, MachineInstr::Tag::ST,
+                {context.val_map[st_val], st_pos, Immediate::create(0)},
+                MachineInstr::Suffix::BYTE);
         else if (type->get_size() == 4)
-            builder.gen_instr(context.machine_bb, MachineInstr::Tag::ST,
-                              {context.val_map[st_val], context.val_map[ptr],
-                               std::make_shared<Immediate>(0)},
-                              MachineInstr::Suffix::WORD);
+            builder.append_instr(
+                context.machine_bb, MachineInstr::Tag::ST,
+                {context.val_map[st_val], st_pos, Immediate::create(0)},
+                MachineInstr::Suffix::WORD);
         else if (type->get_size() == 8)
-            builder.gen_instr(context.machine_bb, MachineInstr::Tag::ST,
-                              {context.val_map[st_val], context.val_map[ptr],
-                               std::make_shared<Immediate>(0)},
-                              MachineInstr::Suffix::DWORD);
+            builder.append_instr(
+                context.machine_bb, MachineInstr::Tag::ST,
+                {context.val_map[st_val], st_pos, Immediate::create(0)},
+                MachineInstr::Suffix::DWORD);
         else
             assert(false);
     }
@@ -259,56 +327,56 @@ void InstructionSelector::gen_icmp() {
         tmp_reg2 = VirtualRegister::create(Register::General);
         tmp_reg3 = VirtualRegister::create(Register::General);
         tmp_reg4 = VirtualRegister::create(Register::General);
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::SLT,
-                          {tmp_reg1, op1, op2});
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::SLT,
-                          {tmp_reg2, op2, op1});
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::OR,
-                          {tmp_reg3, tmp_reg1, tmp_reg2});
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::XORI,
-                          {tmp_reg4, tmp_reg3, std::make_shared<Immediate>(1)});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::SLT,
+                             {tmp_reg1, op1, op2});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::SLT,
+                             {tmp_reg2, op2, op1});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::OR,
+                             {tmp_reg3, tmp_reg1, tmp_reg2});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::XORI,
+                             {tmp_reg4, tmp_reg3, Immediate::create(0)});
         context.val_map[context.IR_inst] = tmp_reg4;
         break;
     case Instruction::ne:
         tmp_reg1 = VirtualRegister::create(Register::General);
         tmp_reg2 = VirtualRegister::create(Register::General);
         tmp_reg3 = VirtualRegister::create(Register::General);
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::SLT,
-                          {tmp_reg1, op1, op2});
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::SLT,
-                          {tmp_reg2, op2, op1});
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::OR,
-                          {tmp_reg3, tmp_reg1, tmp_reg2});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::SLT,
+                             {tmp_reg1, op1, op2});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::SLT,
+                             {tmp_reg2, op2, op1});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::OR,
+                             {tmp_reg3, tmp_reg1, tmp_reg2});
         context.val_map[context.IR_inst] = tmp_reg3;
         break;
     case Instruction::gt:
         tmp_reg1 = VirtualRegister::create(Register::General);
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::SLT,
-                          {tmp_reg1, op2, op1});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::SLT,
+                             {tmp_reg1, op2, op1});
         context.val_map[context.IR_inst] = tmp_reg1;
         break;
     case Instruction::ge:
         tmp_reg1 = VirtualRegister::create(Register::General);
         tmp_reg2 = VirtualRegister::create(Register::General);
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::SLT,
-                          {tmp_reg1, op1, op2});
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::XORI,
-                          {tmp_reg2, tmp_reg1, std::make_shared<Immediate>(1)});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::SLT,
+                             {tmp_reg1, op1, op2});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::XORI,
+                             {tmp_reg2, tmp_reg1, Immediate::create(0)});
         context.val_map[context.IR_inst] = tmp_reg2;
         break;
     case Instruction::lt:
         tmp_reg1 = VirtualRegister::create(Register::General);
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::SLT,
-                          {tmp_reg1, op1, op2});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::SLT,
+                             {tmp_reg1, op1, op2});
         context.val_map[context.IR_inst] = tmp_reg1;
         break;
     case Instruction::le:
         tmp_reg1 = VirtualRegister::create(Register::General);
         tmp_reg2 = VirtualRegister::create(Register::General);
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::SLT,
-                          {tmp_reg1, op2, op1});
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::XORI,
-                          {tmp_reg2, tmp_reg1, std::make_shared<Immediate>(1)});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::SLT,
+                             {tmp_reg1, op2, op1});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::XORI,
+                             {tmp_reg2, tmp_reg1, Immediate::create(1)});
         context.val_map[context.IR_inst] = tmp_reg2;
         break;
     default:
@@ -325,35 +393,35 @@ void InstructionSelector::gen_fcmp() {
     std::shared_ptr<MachineInstr> inst;
     switch (fcmpInst->get_instr_type()) {
     case Instruction::feq:
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::FCMP_SEQ_S,
-                          {tmp_fccreg, op1, op2});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::FCMP_SEQ_S,
+                             {tmp_fccreg, op1, op2});
         break;
     case Instruction::fne:
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::FCMP_SNE_S,
-                          {tmp_fccreg, op1, op2});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::FCMP_SNE_S,
+                             {tmp_fccreg, op1, op2});
         break;
     case Instruction::fgt:
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::FCMP_SLT_S,
-                          {tmp_fccreg, op2, op1});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::FCMP_SLT_S,
+                             {tmp_fccreg, op2, op1});
         break;
     case Instruction::fge:
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::FCMP_SLE_S,
-                          {tmp_fccreg, op2, op1});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::FCMP_SLE_S,
+                             {tmp_fccreg, op2, op1});
         break;
     case Instruction::flt:
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::FCMP_SLT_S,
-                          {tmp_fccreg, op1, op2});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::FCMP_SLT_S,
+                             {tmp_fccreg, op1, op2});
         break;
     case Instruction::fle:
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::FCMP_SLE_S,
-                          {tmp_fccreg, op1, op2});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::FCMP_SLE_S,
+                             {tmp_fccreg, op1, op2});
         break;
     default:
         assert(false);
     }
     auto tmp_reg = VirtualRegister::create(Register::General);
-    builder.gen_instr(context.machine_bb, MachineInstr::Tag::MOVCF2GR,
-                      {tmp_reg, tmp_fccreg});
+    builder.append_instr(context.machine_bb, MachineInstr::Tag::MOVCF2GR,
+                         {tmp_reg, tmp_fccreg});
     context.val_map[context.IR_inst] = tmp_reg;
 }
 
@@ -367,14 +435,13 @@ void InstructionSelector::gen_phi() {
             auto *bb_prev =
                 static_cast<BasicBlock *>(phiInst->get_operand(i + 1));
             auto machine_bb_prev = bb_map[bb_prev];
-            builder.insert_instr(
-                machine_bb_prev, MachineInstr::Tag::MOV,
-                {tmp_reg, context.val_map[op]},
-                std::prev(machine_bb_prev->get_instrs().end()));
+            builder.insert_instr_before_b(machine_bb_prev,
+                                          MachineInstr::Tag::MOV,
+                                          {tmp_reg, context.val_map[op]});
         }
         auto phi_reg = VirtualRegister::create(Register::General);
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::MOV,
-                          {phi_reg, tmp_reg});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::MOV,
+                             {phi_reg, tmp_reg});
         context.val_map[phiInst] = phi_reg;
     } else if (phiInst->get_type()->is_float_type()) {
         auto tmp_freg = VirtualRegister::create(Register::Float);
@@ -383,99 +450,76 @@ void InstructionSelector::gen_phi() {
             auto *bb_prev =
                 static_cast<BasicBlock *>(phiInst->get_operand(i + 1));
             auto machine_bb_prev = bb_map[bb_prev];
-            builder.insert_instr(
-                machine_bb_prev, MachineInstr::Tag::MOV,
-                {tmp_freg, context.val_map[op]},
-                std::prev(machine_bb_prev->get_instrs().end()));
+            builder.insert_instr_before_b(machine_bb_prev,
+                                          MachineInstr::Tag::MOV,
+                                          {tmp_freg, context.val_map[op]});
         }
         auto phi_freg = VirtualRegister::create(Register::Float);
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::MOV,
-                          {phi_freg, tmp_freg});
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::MOV,
+                             {phi_freg, tmp_freg});
         context.val_map[phiInst] = phi_freg;
     } else
         assert(false);
 }
 
 void InstructionSelector::gen_call() {
-
-    
-    // auto *callInst = static_cast<CallInst *>(context.IR_inst);
-    // auto *callee = callInst->get_operand(0);
-    // auto *func = static_cast<Function *>(callee);
-
-    // unsigned int garg_cnt = 0;
-    // unsigned int farg_cnt = 0;
-    // unsigned int stk_cnt = 0;
-    // unsigned int farg_all = 0;
-    // unsigned int garg_all = 0;
-
-    // for (auto &arg : func->get_args()) {
-    //     if (arg.get_type()->is_float_type())
-    //         farg_all++;
-    //     else
-    //         garg_all++;
-    // }
-    // int offset = 0;
-    // offset += (garg_all > 8 ? garg_all - 8 : 0) * 8;
-    // offset += (farg_all > 8 ? farg_all - 8 : 0) * 8;
-    // offset = ALIGN(offset, 16);
-    // if (IS_IMM_12(offset))
-    //     append_inst("addi.d $sp, $sp, " + std::to_string(-offset));
-    // else {
-    //     load_large_int64(-offset, Reg::t(0));
-    //     append_inst("add.d $sp, $sp, $t0");
-    // }
-    // for (auto &arg : func->get_args()) {
-    //     auto *arg_val = callInst->get_operand(garg_cnt + farg_cnt + 1);
-    //     if (arg.get_type()->is_float_type()) {
-    //         if (farg_cnt < 8)
-    //             load_to_freg(arg_val, FReg::fa(farg_cnt));
-    //         else {
-    //             load_to_freg(arg_val, FReg::ft(0));
-    //             if (IS_IMM_12(8 * stk_cnt))
-    //                 append_inst("fst.s",
-    //                             {"$ft0", "$sp", std::to_string(8 * stk_cnt)});
-    //             else {
-    //                 load_large_int64(8 * stk_cnt, Reg::t(0));
-    //                 append_inst("add.d $t0, $sp, $t0");
-    //                 append_inst("fst.s", {"$ft0", "$t0", "0"});
-    //             }
-
-    //             stk_cnt++;
-    //         }
-    //         farg_cnt++;
-    //     } else { // int or pointer
-    //         if (garg_cnt < 8)
-    //             load_to_greg(arg_val, Reg::a(garg_cnt));
-    //         else {
-    //             load_to_greg(arg_val, Reg::t(0));
-    //             if (IS_IMM_12(8 * stk_cnt))
-    //                 append_inst("st.d",
-    //                             {"$t0", "$sp", std::to_string(8 * stk_cnt)});
-    //             else {
-    //                 load_large_int64(8 * stk_cnt, Reg::t(1));
-    //                 append_inst("add.d $t1, $sp, $t1");
-    //                 append_inst("st.d", {"$t0", "$t1", "0"});
-    //             }
-    //             stk_cnt++;
-    //         }
-    //         garg_cnt++;
-    //     }
-    // }
-    // append_inst("bl", {func->get_name()});
-    // if (IS_IMM_12(offset))
-    //     append_inst("addi.d $sp, $sp, " + std::to_string(offset));
-    // else {
-    //     load_large_int64(offset, Reg::t(0));
-    //     append_inst("add.d $sp, $sp, $t0");
-    // }
-    // if (not callInst->get_type()->is_void_type()) {
-    //     if (callInst->get_type()->is_integer_type() ||
-    //         callInst->get_type()->is_void_type())
-    //         store_from_greg(callInst, Reg::a(0));
-    //     else if (callInst->get_type()->is_float_type())
-    //         store_from_freg(callInst, FReg::fa(0));
-    // }
+    auto *callInst = static_cast<CallInst *>(context.IR_inst);
+    auto *callee = callInst->get_operand(0);
+    auto *func = static_cast<Function *>(callee);
+    auto mf = func_map[func];
+    builder.add_int_to_reg(context.machine_bb, PhysicalRegister::sp(),
+                           PhysicalRegister::sp(), -mf->params_size);
+    int cnt = 0;
+    for (auto &arg : func->get_args()) {
+        auto *arg_val = callInst->get_operand(++cnt);
+        auto suffix = (arg_val->get_type()->get_size() == 8)
+                          ? MachineInstr::Suffix::DWORD
+                          : MachineInstr::Suffix::WORD;
+        if (mf->params_schedule_map[&arg].on_stack) {
+            if (arg_val->get_type()->is_integer_type() ||
+                arg_val->get_type()->is_pointer_type())
+                builder.store_to_stack(
+                    context.machine_bb, context.val_map[arg_val],
+                    PhysicalRegister::sp(),
+                    mf->params_schedule_map[&arg].offset, suffix);
+            else if (arg_val->get_type()->is_float_type())
+                builder.store_to_stack(context.machine_bb,
+                                       context.val_map[arg_val],
+                                       PhysicalRegister::sp(),
+                                       mf->params_schedule_map[&arg].offset);
+            else
+                assert(false);
+        } else {
+            if (arg_val->get_type()->is_integer_type() ||
+                arg_val->get_type()->is_pointer_type())
+                builder.append_instr(context.machine_bb, MachineInstr::Tag::MOV,
+                                     {mf->params_schedule_map[&arg].reg,
+                                      context.val_map[arg_val]});
+            else if (arg_val->get_type()->is_float_type())
+                builder.append_instr(context.machine_bb, MachineInstr::Tag::MOV,
+                                     {mf->params_schedule_map[&arg].reg,
+                                      context.val_map[arg_val]});
+            else
+                assert(false);
+        }
+    }
+    builder.append_instr(context.machine_bb, MachineInstr::Tag::BL,
+                         {std::make_shared<Label>(mf->get_prologue_block())});
+    builder.add_int_to_reg(context.machine_bb, PhysicalRegister::sp(),
+                           PhysicalRegister::sp(), mf->params_size);
+    if (not callInst->get_type()->is_void_type()) {
+        if (callInst->get_type()->is_integer_type()) {
+            auto tmp_reg = VirtualRegister::create(Register::General);
+            builder.append_instr(context.machine_bb, MachineInstr::Tag::MOV,
+                                 {tmp_reg, PhysicalRegister::a(0)});
+            context.val_map[callInst] = tmp_reg;
+        } else if (callInst->get_type()->is_float_type()) {
+            auto tmp_freg = VirtualRegister::create(Register::Float);
+            builder.append_instr(context.machine_bb, MachineInstr::Tag::MOV,
+                                 {tmp_freg, PhysicalRegister::fa(0)});
+            context.val_map[callInst] = tmp_freg;
+        }
+    }
 }
 
 void InstructionSelector::gen_gep() {
@@ -498,20 +542,20 @@ void InstructionSelector::gen_gep() {
         auto tmp_reg1 = VirtualRegister::create(Register::General);
         auto tmp_reg2 = VirtualRegister::create(Register::General);
         auto tmp_reg3 = VirtualRegister::create(Register::General);
-        if (std::make_shared<Immediate>(size)->is_imm_length(12)) {
-            builder.gen_instr(context.machine_bb, MachineInstr::Tag::ADDI,
-                              {tmp_reg1, PhysicalRegister::zero(),
-                               std::make_shared<Immediate>(size)},
-                              MachineInstr::Suffix::WORD);
+        if (Immediate::create(size)->is_imm_length(12)) {
+            builder.append_instr(
+                context.machine_bb, MachineInstr::Tag::ADDI,
+                {tmp_reg1, PhysicalRegister::zero(), Immediate::create(size)},
+                MachineInstr::Suffix::WORD);
         } else {
             builder.load_large_int32(context.machine_bb, size, tmp_reg1);
         }
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::MUL,
-                          {tmp_reg2, context.val_map[idx], tmp_reg1},
-                          MachineInstr::Suffix::WORD);
-        builder.gen_instr(context.machine_bb, MachineInstr::Tag::ADD,
-                          {tmp_reg3, pre, tmp_reg2},
-                          MachineInstr::Suffix::DWORD);
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::MUL,
+                             {tmp_reg2, context.val_map[idx], tmp_reg1},
+                             MachineInstr::Suffix::WORD);
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::ADD,
+                             {tmp_reg3, pre, tmp_reg2},
+                             MachineInstr::Suffix::DWORD);
         pre = tmp_reg3;
     }
     context.val_map[gepInst] = pre;
@@ -529,10 +573,10 @@ void InstructionSelector::gen_sitofp() {
     auto *op = sitofpInst->get_operand(0);
     auto tmp_freg1 = VirtualRegister::create(Register::Float);
     auto tmp_freg2 = VirtualRegister::create(Register::Float);
-    builder.gen_instr(context.machine_bb, MachineInstr::Tag::MOVGR2FR_W,
-                      {tmp_freg1, context.val_map[op]});
-    builder.gen_instr(context.machine_bb, MachineInstr::Tag::FFINT_S_W,
-                      {tmp_freg2, tmp_freg1});
+    builder.append_instr(context.machine_bb, MachineInstr::Tag::MOVGR2FR_W,
+                         {tmp_freg1, context.val_map[op]});
+    builder.append_instr(context.machine_bb, MachineInstr::Tag::FFINT_S_W,
+                         {tmp_freg2, tmp_freg1});
     context.val_map[context.IR_inst] = tmp_freg2;
 }
 
@@ -542,10 +586,10 @@ void InstructionSelector::gen_fptosi() {
     auto *op = fptosiInst->get_operand(0);
     auto tmp_freg = VirtualRegister::create(Register::Float);
     auto tmp_reg = VirtualRegister::create(Register::General);
-    builder.gen_instr(context.machine_bb, MachineInstr::Tag::FTINTRZ_W_S,
-                      {tmp_freg, context.val_map[op]});
-    builder.gen_instr(context.machine_bb, MachineInstr::Tag::MOVFR2GR_S,
-                      {tmp_reg, tmp_freg});
+    builder.append_instr(context.machine_bb, MachineInstr::Tag::FTINTRZ_W_S,
+                         {tmp_freg, context.val_map[op]});
+    builder.append_instr(context.machine_bb, MachineInstr::Tag::MOVFR2GR_S,
+                         {tmp_reg, tmp_freg});
     context.val_map[context.IR_inst] = tmp_reg;
 }
 
