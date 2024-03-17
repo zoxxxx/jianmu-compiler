@@ -503,8 +503,26 @@ void InstructionSelector::gen_call() {
                 assert(false);
         }
     }
+    std::unordered_map<std::shared_ptr<PhysicalRegister>,
+                       std::shared_ptr<VirtualRegister>>
+        reg_map;
+    reg_map.clear();
+    for (auto reg : PhysicalRegister::caller_saved_regs()) {
+        if (reg->get_type() == Register::General)
+            reg_map[reg] = VirtualRegister::create(Register::General);
+        else if (reg->get_type() == Register::Float)
+            reg_map[reg] = VirtualRegister::create(Register::Float);
+        else if (reg->get_type() == Register::FloatCmp)
+            reg_map[reg] = VirtualRegister::create(Register::FloatCmp);
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::MOV,
+                             {reg_map[reg], reg});
+    }
     builder.append_instr(context.machine_bb, MachineInstr::Tag::BL,
                          {std::make_shared<Label>(mf->get_prologue_block())});
+    for (auto reg : PhysicalRegister::caller_saved_regs()) {
+        builder.append_instr(context.machine_bb, MachineInstr::Tag::MOV,
+                             {reg, reg_map[reg]});
+    }
     builder.add_int_to_reg(context.machine_bb, PhysicalRegister::sp(),
                            PhysicalRegister::sp(), mf->params_size);
     if (not callInst->get_type()->is_void_type()) {

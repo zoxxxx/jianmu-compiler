@@ -163,9 +163,21 @@ void MIBuilder::gen_prologue_epilogue(std::shared_ptr<MachineFunction> MF) {
     append_instr(prologue, MachineInstr::Tag::MOV, {PhysicalRegister::fp(), PhysicalRegister::sp()});
     add_int_to_reg(prologue, PhysicalRegister::sp(), PhysicalRegister::sp(), -MF->frame_scheduler->get_frame_size());
     for (auto reg : PhysicalRegister::callee_saved_regs()){
-        auto tmp_reg = VirtualRegister::create(Register::General);
-        append_instr(prologue, MachineInstr::Tag::MOV, {tmp_reg, reg});
-        append_instr(epilogue, MachineInstr::Tag::MOV, {reg, tmp_reg});
+        if(reg->get_type() == Register::RegisterType::General){
+            auto tmp_reg = VirtualRegister::create(Register::General);
+            append_instr(prologue, MachineInstr::Tag::MOV, {tmp_reg, reg});
+            append_instr(epilogue, MachineInstr::Tag::MOV, {reg, tmp_reg});
+        }
+        else if(reg->get_type() == Register::RegisterType::Float){
+            auto tmp_reg = VirtualRegister::create(Register::Float);
+            append_instr(prologue, MachineInstr::Tag::MOV, {tmp_reg, reg});
+            append_instr(epilogue, MachineInstr::Tag::MOV, {reg, tmp_reg});
+        }
+        else if(reg->get_type() == Register::RegisterType::FloatCmp){
+            auto tmp_reg = VirtualRegister::create(Register::FloatCmp);
+            append_instr(prologue, MachineInstr::Tag::MOV, {tmp_reg, reg});
+            append_instr(epilogue, MachineInstr::Tag::MOV, {reg, tmp_reg});
+        }
     }
     append_instr(epilogue, MachineInstr::Tag::MOV, {PhysicalRegister::sp(), PhysicalRegister::fp()});
     append_instr(epilogue, MachineInstr::Tag::MOV, {PhysicalRegister::fp(), fp_st_reg});
