@@ -120,7 +120,6 @@ class VirtualRegister : public Register {
     std::string get_name() const override final ;
   private:
     unsigned id;
-    RegisterType type;
 };
 
 class PhysicalRegister : public Register {
@@ -149,7 +148,7 @@ class PhysicalRegister : public Register {
             RegisterType::General, 3);
     }
     static std::shared_ptr<PhysicalRegister> a(unsigned i) {
-        assert(i < 4);
+        assert(i < 8);
         return RegisterFactory::get_instance().get_register(
             RegisterType::General, i + 4);
     }
@@ -208,7 +207,6 @@ class PhysicalRegister : public Register {
 
   private:
     unsigned id;
-    RegisterType type;
 };
 
 class Immediate : public Operand {

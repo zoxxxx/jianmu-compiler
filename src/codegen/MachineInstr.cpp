@@ -156,6 +156,7 @@ std::string MachineInstr::print() const {
     if (comment != "") {
         res += " # " + comment;
     }
+    res += "\n";
     return res;
 }
 

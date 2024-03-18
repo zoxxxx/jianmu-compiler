@@ -54,23 +54,29 @@ std::shared_ptr<MachineInstr> MIBuilder::insert_instr_before_b(
     return instr;
 }
 
-void MIBuilder::load_large_int32(std::shared_ptr<MachineBasicBlock> mbb,
-                                 int32_t val, std::shared_ptr<Register> reg) {
+void MIBuilder::load_int32(std::shared_ptr<MachineBasicBlock> mbb, int32_t val,
+                           std::shared_ptr<Register> reg) {
     int32_t high_20 = val >> 12; // si20
     uint32_t low_12 = val & LOW_12_MASK;
     auto tmp_reg = VirtualRegister::create(Register::General);
+    if (high_20 == 0) {
+        append_instr(
+            mbb, MachineInstr::Tag::ORI,
+            {reg, PhysicalRegister::zero(), Immediate::create(low_12)});
+        return;
+    }
     append_instr(mbb, MachineInstr::Tag::LU12I_W,
                  {tmp_reg, Immediate::create(high_20)});
     append_instr(mbb, MachineInstr::Tag::ORI,
                  {reg, tmp_reg, Immediate::create(low_12)});
 }
 
-void MIBuilder::load_large_int64(std::shared_ptr<MachineBasicBlock> mbb,
-                                 int64_t val, std::shared_ptr<Register> reg) {
+void MIBuilder::load_int64(std::shared_ptr<MachineBasicBlock> mbb, int64_t val,
+                           std::shared_ptr<Register> reg) {
     auto low_32 = static_cast<int32_t>(val & LOW_32_MASK);
 
     auto tmp_reg1 = VirtualRegister::create(Register::General);
-    load_large_int32(mbb, low_32, tmp_reg1);
+    load_int32(mbb, low_32, tmp_reg1);
 
     auto high_32 = static_cast<int32_t>(val >> 32);
     int32_t high_32_low_20 = (high_32 << 12) >> 12; // si20
@@ -83,6 +89,13 @@ void MIBuilder::load_large_int64(std::shared_ptr<MachineBasicBlock> mbb,
                  {reg, tmp_reg2, Immediate::create(high_32_high_12)});
 }
 
+void MIBuilder::load_float(std::shared_ptr<MachineBasicBlock> mbb, float val,
+                           std::shared_ptr<Register> reg) {
+    auto tmp_reg = VirtualRegister::create(Register::General);
+    load_int32(mbb, *reinterpret_cast<int32_t *>(&val), tmp_reg);
+    append_instr(mbb, MachineInstr::Tag::MOVGR2FR_W, {reg, tmp_reg});
+}
+
 void MIBuilder::add_int_to_reg(std::shared_ptr<MachineBasicBlock> mbb,
                                std::shared_ptr<Register> dst,
                                std::shared_ptr<Register> src, int64_t val) {
@@ -91,14 +104,14 @@ void MIBuilder::add_int_to_reg(std::shared_ptr<MachineBasicBlock> mbb,
     }
     auto imm = Immediate::create(val);
     if (imm->is_imm_length(12))
-        append_instr(mbb, MachineInstr::Tag::ADDI, {dst, src, imm});
+        append_instr(mbb, MachineInstr::Tag::ADDI, {dst, src, imm}, MachineInstr::Suffix::DWORD);
     else {
         auto tmp_reg = VirtualRegister::create(Register::General);
         if (val <= INT32_MAX && val >= INT32_MIN)
-            load_large_int32(mbb, val, tmp_reg);
+            load_int32(mbb, val, tmp_reg);
         else
-            load_large_int64(mbb, val, tmp_reg);
-        append_instr(mbb, MachineInstr::Tag::ADD, {dst, src, tmp_reg});
+            load_int64(mbb, val, tmp_reg);
+        append_instr(mbb, MachineInstr::Tag::ADD, {dst, src, tmp_reg}, MachineInstr::Suffix::DWORD);
     }
 }
 
@@ -116,7 +129,7 @@ void MIBuilder::store_to_stack(std::shared_ptr<MachineBasicBlock> mbb,
                          {reg, ptr, Immediate::create(offset)});
     } else {
         auto tmp_reg = VirtualRegister::create(Register::General);
-        load_large_int32(mbb, offset, tmp_reg);
+        load_int32(mbb, offset, tmp_reg);
         append_instr(mbb, MachineInstr::Tag::ADD, {tmp_reg, ptr, tmp_reg},
                      MachineInstr::Suffix::DWORD);
         if (reg->get_type() == Register::RegisterType::General)
@@ -141,7 +154,7 @@ void MIBuilder::load_from_stack(std::shared_ptr<MachineBasicBlock> mbb,
                          {reg, ptr, Immediate::create(offset)});
     } else {
         auto tmp_reg = VirtualRegister::create(Register::General);
-        load_large_int32(mbb, offset, tmp_reg);
+        load_int32(mbb, offset, tmp_reg);
         append_instr(mbb, MachineInstr::Tag::ADD, {tmp_reg, ptr, tmp_reg},
                      MachineInstr::Suffix::DWORD);
         if (reg->get_type() == Register::RegisterType::General)
@@ -158,31 +171,36 @@ void MIBuilder::gen_prologue_epilogue(std::shared_ptr<MachineFunction> MF) {
     auto epilogue = MF->get_epilogue_block();
     prologue->clear_instrs();
     epilogue->clear_instrs();
-    auto fp_st_reg = VirtualRegister::create(Register::General, Register::kUSING_SP_AS_FRAME_REG);
-    append_instr(prologue, MachineInstr::Tag::MOV, {fp_st_reg, PhysicalRegister::fp()});
-    append_instr(prologue, MachineInstr::Tag::MOV, {PhysicalRegister::fp(), PhysicalRegister::sp()});
-    add_int_to_reg(prologue, PhysicalRegister::sp(), PhysicalRegister::sp(), -MF->frame_scheduler->get_frame_size());
-    for (auto reg : PhysicalRegister::callee_saved_regs()){
-        if(reg->get_type() == Register::RegisterType::General){
+    auto fp_st_reg = VirtualRegister::create(Register::General,
+                                             Register::kUSING_SP_AS_FRAME_REG);
+    append_instr(prologue, MachineInstr::Tag::MOV,
+                 {fp_st_reg, PhysicalRegister::fp()});
+    append_instr(prologue, MachineInstr::Tag::MOV,
+                 {PhysicalRegister::fp(), PhysicalRegister::sp()});
+    add_int_to_reg(prologue, PhysicalRegister::sp(), PhysicalRegister::sp(),
+                   -MF->frame_scheduler->get_frame_size());
+    for (auto reg : PhysicalRegister::callee_saved_regs()) {
+        if (reg->get_type() == Register::RegisterType::General) {
             auto tmp_reg = VirtualRegister::create(Register::General);
             append_instr(prologue, MachineInstr::Tag::MOV, {tmp_reg, reg});
             append_instr(epilogue, MachineInstr::Tag::MOV, {reg, tmp_reg});
-        }
-        else if(reg->get_type() == Register::RegisterType::Float){
+        } else if (reg->get_type() == Register::RegisterType::Float) {
             auto tmp_reg = VirtualRegister::create(Register::Float);
             append_instr(prologue, MachineInstr::Tag::MOV, {tmp_reg, reg});
             append_instr(epilogue, MachineInstr::Tag::MOV, {reg, tmp_reg});
-        }
-        else if(reg->get_type() == Register::RegisterType::FloatCmp){
+        } else if (reg->get_type() == Register::RegisterType::FloatCmp) {
             auto tmp_reg = VirtualRegister::create(Register::FloatCmp);
             append_instr(prologue, MachineInstr::Tag::MOV, {tmp_reg, reg});
             append_instr(epilogue, MachineInstr::Tag::MOV, {reg, tmp_reg});
         }
     }
-    append_instr(epilogue, MachineInstr::Tag::MOV, {PhysicalRegister::sp(), PhysicalRegister::fp()});
-    append_instr(epilogue, MachineInstr::Tag::MOV, {PhysicalRegister::fp(), fp_st_reg});
+    append_instr(epilogue, MachineInstr::Tag::MOV,
+                 {PhysicalRegister::sp(), PhysicalRegister::fp()});
+    append_instr(epilogue, MachineInstr::Tag::MOV,
+                 {PhysicalRegister::fp(), fp_st_reg});
 
-    append_instr(prologue, MachineInstr::Tag::B, {std::make_shared<Label>(MF->get_name()+"_label_entry")});
+    append_instr(prologue, MachineInstr::Tag::B,
+                 {std::make_shared<Label>(MF->get_name() + "_label_entry")});
     append_instr(epilogue, MachineInstr::Tag::JR, {PhysicalRegister::ra()});
 }
 

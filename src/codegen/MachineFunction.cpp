@@ -11,8 +11,8 @@ MachineFunction::get_basic_blocks() const {
 
 std::string MachineFunction::print() const {
     std::string ret;
-    ret += ".globl " + function->get_name() + "\n";
-    ret += ".type " + function->get_name() + ", @function\n";
+    ret += "\t.globl " + function->get_name() + "\n";
+    ret += "\t.type " + function->get_name() + ", @function\n";
     for (auto &bb : basic_blocks) {
         ret += bb->print();
     }

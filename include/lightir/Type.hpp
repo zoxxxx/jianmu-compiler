@@ -34,7 +34,9 @@ class Type {
     bool is_array_type() const { return get_type_id() == ArrayTyID; }
     bool is_pointer_type() const { return get_type_id() == PointerTyID; }
     bool is_float_type() const { return get_type_id() == FloatTyID; }
+    bool is_int64_type() const;
     bool is_int32_type() const;
+    bool is_int8_type() const;
     bool is_int1_type() const;
 
     // Return related data member if is the required type, else throw error

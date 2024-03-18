@@ -7,6 +7,7 @@
 #include "MachinePass.hpp"
 #include "Module.hpp"
 #include "Operand.hpp"
+#include <cassert>
 #include <memory>
 class InstructionSelector : public MachinePass {
   public:
@@ -18,6 +19,7 @@ class InstructionSelector : public MachinePass {
     void gen_inst();
 
     void gen_store_params();
+    void set_all_regs();
 
     void gen_ret();
     void gen_br();
@@ -36,20 +38,23 @@ class InstructionSelector : public MachinePass {
     void gen_bitcast();
     void gen_phi();
 
+    std::shared_ptr<Register> get_reg(Value *val) ;
+    void set_reg(Value *val, std::shared_ptr<Register> reg);
     struct {
         std::shared_ptr<MachineFunction> machine_func;           // 当前函数
         std::shared_ptr<MachineBasicBlock> machine_bb = nullptr; // 当前指令
         Instruction *IR_inst = nullptr;                          // 当前指令
-        std::unordered_map<Value *, std::shared_ptr<Register>> val_map{}; // 值到寄存器的映射
 
         void clear() {
             machine_func = nullptr;
             machine_bb = nullptr;
             IR_inst = nullptr;
-            val_map.clear();
+            // val_map.clear();
         }
 
     } context;
+    
+    std::unordered_map<Value *, std::shared_ptr<Register>> val_map{};
     Module *IR_module;
     MIBuilder builder;
     std::map<Function *, std::shared_ptr<MachineFunction>> func_map;

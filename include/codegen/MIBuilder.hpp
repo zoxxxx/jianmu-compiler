@@ -72,9 +72,11 @@ class MIBuilder {
         std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
         std::initializer_list<std::shared_ptr<Operand>> operands,
         MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
-    void load_large_int32(std::shared_ptr<MachineBasicBlock> mbb, int32_t val,
+    void load_int32(std::shared_ptr<MachineBasicBlock> mbb, int32_t val,
                           std::shared_ptr<Register> reg);
-    void load_large_int64(std::shared_ptr<MachineBasicBlock> mbb, int64_t val,
+    void load_int64(std::shared_ptr<MachineBasicBlock> mbb, int64_t val,
+                          std::shared_ptr<Register> reg);
+    void load_float(std::shared_ptr<MachineBasicBlock> mbb, float val,
                           std::shared_ptr<Register> reg);
     void add_int_to_reg(std::shared_ptr<MachineBasicBlock> mbb,
                         std::shared_ptr<Register> dst,

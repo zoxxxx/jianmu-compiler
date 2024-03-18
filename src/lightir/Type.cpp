@@ -14,9 +14,20 @@ bool Type::is_int1_type() const {
     return is_integer_type() and
            static_cast<const IntegerType *>(this)->get_num_bits() == 1;
 }
+
+bool Type::is_int8_type() const {
+    return is_integer_type() and
+           static_cast<const IntegerType *>(this)->get_num_bits() == 8;
+}
+
 bool Type::is_int32_type() const {
     return is_integer_type() and
            static_cast<const IntegerType *>(this)->get_num_bits() == 32;
+}
+
+bool Type::is_int64_type() const {
+    return is_integer_type() and
+           static_cast<const IntegerType *>(this)->get_num_bits() == 64;
 }
 
 Type *Type::get_pointer_element_type() const {
@@ -36,9 +47,13 @@ unsigned Type::get_size() const {
     case IntegerTyID: {
         if (is_int1_type())
             return 1;
+        else if(is_int8_type())
+            return 1;
         else if (is_int32_type())
             return 4;
-        else
+        else if(is_int64_type())
+            return 8;
+        else 
             assert(false && "Type::get_size(): unexpected int type bits");
     }
     case ArrayTyID: {

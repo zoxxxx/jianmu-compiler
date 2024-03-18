@@ -18,7 +18,7 @@ std::shared_ptr<Immediate> Immediate::create(int value) {
 }
 
 std::string VirtualRegister::get_name() const {
-    std::string ret = "";
+    std::string ret = "$";
     switch (type) {
     case RegisterType::General:
         ret += "v_r";
@@ -70,7 +70,7 @@ PhysicalRegister::caller_saved_regs() {
 }
 
 std::string PhysicalRegister::get_name() const {
-    std::string ret = "";
+    std::string ret = "$";
     switch (type) {
     case RegisterType::General:
         ret += "r";
