@@ -16,7 +16,7 @@ std::shared_ptr<MachineInstr> MIBuilder::append_instr(
     MachineInstr::Suffix suffix) {
     assert(InstructionChecker::get_instance().check(tag, operands, suffix));
     std::shared_ptr<MachineInstr> instr =
-        std::make_shared<MachineInstr>(tag, operands, suffix);
+        std::make_shared<MachineInstr>(mbb, tag, operands, suffix);
     mbb->append_instr(instr);
     return instr;
 }
@@ -28,18 +28,18 @@ std::shared_ptr<MachineInstr> MIBuilder::insert_instr(
     MachineInstr::Suffix suffix) {
     assert(InstructionChecker::get_instance().check(tag, operands, suffix));
     std::shared_ptr<MachineInstr> instr =
-        std::make_shared<MachineInstr>(tag, operands, suffix);
+        std::make_shared<MachineInstr>(mbb, tag, operands, suffix);
     mbb->insert_instr(instr, it);
     return instr;
 }
 
-std::shared_ptr<MachineInstr> insert_instr_before_b(
+std::shared_ptr<MachineInstr> MIBuilder::insert_instr_before_b(
     std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
     std::initializer_list<std::shared_ptr<Operand>> operands,
-    MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE) {
+    MachineInstr::Suffix suffix) {
     assert(InstructionChecker::get_instance().check(tag, operands, suffix));
     std::shared_ptr<MachineInstr> instr =
-        std::make_shared<MachineInstr>(tag, operands, suffix);
+        std::make_shared<MachineInstr>(mbb, tag, operands, suffix);
     auto it = mbb->get_instrs().rbegin();
     while (it != mbb->get_instrs().rend() &&
            ((*it)->get_tag() == MachineInstr::Tag::B ||
@@ -394,4 +394,13 @@ bool InstructionChecker::check_other(
         }
     }
     return true;
+}
+
+bool InstructionChecker::check(MachineInstr::Tag tag,
+                               std::vector<std::shared_ptr<Operand>> operands,
+                               MachineInstr::Suffix suffix) {
+    return check_operands_type(tag, operands) && check_suffix(tag, suffix) &&
+           check_imm(tag, operands, requirements[tag].imm_length,
+                     requirements[tag].imm_signed) &&
+           check_other(tag, operands);
 }

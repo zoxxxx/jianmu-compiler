@@ -1,3 +1,5 @@
+#pragma once
+
 #include "MachineModule.hpp"
 #include "Module.hpp"
 #include "Operand.hpp"
@@ -13,6 +15,7 @@ class MachinePass {
 
 class MachinePassManager {
   public:
+    MachinePassManager(std::shared_ptr<MachineModule> module) : machine_module(module) {}
     template <typename PassType, typename... Args>
     void add_pass(Args &&...args) {
         machine_passes.emplace_back(new PassType(machine_module, std::forward<Args>(args)...));

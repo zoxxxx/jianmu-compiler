@@ -6,3 +6,11 @@ void MachineModule::add_function(std::shared_ptr<MachineFunction> MF) {
 std::vector<std::shared_ptr<MachineFunction>> MachineModule::get_functions() const {
     return functions;
 }
+
+std::string MachineModule::print() const {
+    std::string ret;
+    for (auto &f : functions) {
+        ret += f->print();
+    }
+    return ret;
+}

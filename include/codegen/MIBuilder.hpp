@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Instruction.hpp"
 #include "MachineBasicBlock.hpp"
 #include "MachineInstr.hpp"
@@ -22,12 +24,12 @@ class InstructionChecker {
         size_t imm_length; // 立即数的最大长度，如果有的话
         bool imm_signed;   // 立即数是否有符号
         std::vector<MachineInstr::Suffix> suffixes;
-
+        InstructionRequirement() = default;
         InstructionRequirement(
             size_t num_operands,
             std::initializer_list<OperandType> operands_types,
             size_t imm_length = 0, bool imm_signed = true,
-            std::vector<MachineInstr::Suffix> suffixes =
+            std::initializer_list<MachineInstr::Suffix> suffixes =
                 {MachineInstr::Suffix::NONE})
             : num_operands(num_operands), operand_types(operands_types),
               imm_length(imm_length), imm_signed(imm_signed),
@@ -59,8 +61,8 @@ class MIBuilder {
   public:
     std::shared_ptr<MachineInstr>
     append_instr(std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
-              std::initializer_list<std::shared_ptr<Operand>> operands,
-              MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
+                 std::initializer_list<std::shared_ptr<Operand>> operands,
+                 MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
     std::shared_ptr<MachineInstr>
     insert_instr(std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
                  std::initializer_list<std::shared_ptr<Operand>> operands,
@@ -77,15 +79,17 @@ class MIBuilder {
     void add_int_to_reg(std::shared_ptr<MachineBasicBlock> mbb,
                         std::shared_ptr<Register> dst,
                         std::shared_ptr<Register> src, int64_t imm);
-    void store_to_stack(
-        std::shared_ptr<MachineBasicBlock> mbb, std::shared_ptr<Register> reg,
-        std::shared_ptr<Register> ptr, int offset,
-        MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
-    void load_from_stack(
-        std::shared_ptr<MachineBasicBlock> mbb, std::shared_ptr<Register> reg,
-        std::shared_ptr<Register> ptr, int offset,
-        MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
-    
+    void
+    store_to_stack(std::shared_ptr<MachineBasicBlock> mbb,
+                   std::shared_ptr<Register> reg, std::shared_ptr<Register> ptr,
+                   int offset,
+                   MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
+    void
+    load_from_stack(std::shared_ptr<MachineBasicBlock> mbb,
+                    std::shared_ptr<Register> reg,
+                    std::shared_ptr<Register> ptr, int offset,
+                    MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
+
     void gen_prologue_epilogue(std::shared_ptr<MachineFunction> MF);
     void gen_allocate(std::shared_ptr<MachineFunction> MF);
 };

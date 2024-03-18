@@ -1,6 +1,8 @@
 #pragma once
+
 #include "GlobalVariable.hpp"
 #include "MachineBasicBlock.hpp"
+
 #include <cassert>
 #include <functional>
 #include <memory>
@@ -11,30 +13,30 @@ class VirtualRegister;
 class PhysicalRegister;
 class MachineBasicBlock;
 class Immediate;
-class Operand {
+class Operand : public std::enable_shared_from_this<Operand> {
   public:
     virtual ~Operand() = default;
     virtual bool is_reg() const { return false; }
     virtual bool is_imm() const { return false; }
     virtual bool is_label() const { return false; }
-    std::string print() const;
+    virtual std::string get_name() const = 0;
 };
 
 class Register : public Operand {
   public:
     enum RegisterType { General, Float, FloatCmp };
-    enum RegisterFlag {
-        kUSING_SP_AS_FRAME_REG = 1 << 0
-    };
+    enum RegisterFlag { kUSING_SP_AS_FRAME_REG = 1 << 0 };
     Register() = default;
     virtual ~Register() = default;
     bool is_reg() const override final { return true; }
     virtual bool is_virtual_reg() const { return false; }
     virtual bool is_physical_reg() const { return false; }
+    virtual std::string get_name() const override = 0;
     RegisterType get_type() const { return type; }
     bool is_using_sp_as_frame_reg() const {
         return flags & kUSING_SP_AS_FRAME_REG;
     }
+
   protected:
     RegisterType type;
     unsigned flags;
@@ -49,7 +51,8 @@ class RegisterFactory {
 
     std::shared_ptr<VirtualRegister>
     get_new_virtual_reg(Register::RegisterType type, unsigned flags) {
-        auto reg = std::make_shared<VirtualRegister>(next_virtual_reg_id, type, flags);
+        auto reg =
+            std::make_shared<VirtualRegister>(next_virtual_reg_id, type, flags);
         virtual_regs[next_virtual_reg_id] = reg;
         next_virtual_reg_id++;
         return reg;
@@ -107,13 +110,14 @@ class VirtualRegister : public Register {
     bool is_virtual_reg() const override final { return true; }
     unsigned get_ID() const { return id; }
     RegisterType get_type() const { return type; }
-    static std::shared_ptr<VirtualRegister> create(RegisterType type, unsigned flags = 0) {
+    static std::shared_ptr<VirtualRegister> create(RegisterType type,
+                                                   unsigned flags = 0) {
         return RegisterFactory::get_instance().get_new_virtual_reg(type, flags);
     }
     static std::shared_ptr<VirtualRegister> get(unsigned id) {
         return RegisterFactory::get_instance().get_virtual_reg_by_id(id);
     }
-
+    std::string get_name() const override final ;
   private:
     unsigned id;
     RegisterType type;
@@ -197,39 +201,10 @@ class PhysicalRegister : public Register {
             Register::RegisterType::FloatCmp, i);
     }
 
-    static std::vector<std::shared_ptr<PhysicalRegister>> callee_saved_regs() {
-        std::vector<std::shared_ptr<PhysicalRegister>> regs;
-        for (int i = 0; i <= 7; i++) {
-            regs.push_back(s(i));
-        }
+    static std::vector<std::shared_ptr<PhysicalRegister>> callee_saved_regs();
 
-        for (int i = 0; i <= 7; i++) {
-            regs.push_back(fs(i));
-        }
-        return regs;
-    }
-
-    static std::vector<std::shared_ptr<PhysicalRegister>> caller_saved_regs() {
-        std::vector<std::shared_ptr<PhysicalRegister>> regs;
-        for (int i = 0; i <= 7; i++) {
-            regs.push_back(a(i));
-        }
-        for (int i = 0; i <= 8; i++) {
-            regs.push_back(t(i));
-        }
-
-        for (int i = 0; i <= 7; i++) {
-            regs.push_back(fa(i));
-        }
-        for(int i = 0; i <= 15; i++) {
-            regs.push_back(ft(i));
-        }
-
-        for (int i = 0; i <= 7; i++) {
-            regs.push_back(fcc(i));
-        }
-        return regs;
-    }
+    static std::vector<std::shared_ptr<PhysicalRegister>> caller_saved_regs();
+    std::string get_name() const override final;
 
   private:
     unsigned id;
@@ -239,17 +214,7 @@ class PhysicalRegister : public Register {
 class Immediate : public Operand {
   public:
     ~Immediate() override = default;
-    static std::shared_ptr<Immediate> create(int value) {
-        static std::map<int, std::shared_ptr<Immediate>> pool;
-        auto it = pool.find(value);
-        if (it != pool.end()) {
-            return it->second;
-        } else {
-            auto obj = std::make_shared<Immediate>(value);
-            pool[value] = obj;
-            return obj;
-        }
-    }
+    static std::shared_ptr<Immediate> create(int value) ;
 
     bool is_imm_length(int bits) const {
         assert(bits <= 32 && bits > 0);
@@ -263,23 +228,22 @@ class Immediate : public Operand {
     }
 
     bool is_imm() const override final { return true; }
-
+    std::string get_name() const override final {
+        return std::to_string(value);
+    }
+    Immediate(int value) : value(value) {}
   private:
-    Immediate(int value) : Operand(), value(value) {}
     int value;
 };
 
 class Label : public Operand {
   public:
     Label(std::string name) : name(name) {}
-    Label(std::weak_ptr<MachineBasicBlock> block) {
-        name = block.lock()->get_name();
-    }
+    Label(std::weak_ptr<MachineBasicBlock> block);
     ~Label() override = default;
     bool is_label() const override final { return true; }
-    std::string print() {
-        return name;
-    }
+    std::string get_name() const override final { return name; }
+
   private:
     std::string name;
 };

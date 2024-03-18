@@ -1,5 +1,6 @@
 #include "MachineFunction.hpp"
 #include "Operand.hpp"
+#include <string>
 
 std::string MachineFunction::get_name() const { return function->get_name(); }
 
@@ -8,6 +9,15 @@ MachineFunction::get_basic_blocks() const {
     return basic_blocks;
 }
 
+std::string MachineFunction::print() const {
+    std::string ret;
+    ret += ".globl " + function->get_name() + "\n";
+    ret += ".type " + function->get_name() + ", @function\n";
+    for (auto &bb : basic_blocks) {
+        ret += bb->print();
+    }
+    return ret;
+}
 void MachineFunction::calc_params_schedule() {
     auto &args = function->get_args();
     auto align = [] (int offset, int align) {

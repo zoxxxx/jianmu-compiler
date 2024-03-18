@@ -119,6 +119,8 @@ std::string get_tag_name(MachineInstr::Tag tag) {
     case MachineInstr::Tag::BCNEZ:
         return "bcnez";
     }
+    assert(false && "unknown tag");
+    return "";
 }
 
 std::string get_suffix_name(MachineInstr::Suffix suffix) {
@@ -149,7 +151,7 @@ std::string MachineInstr::print() const {
         } else {
             res += ", ";
         }
-        res += operand->print();
+        res += operand->get_name();
     }
     if (comment != "") {
         res += " # " + comment;

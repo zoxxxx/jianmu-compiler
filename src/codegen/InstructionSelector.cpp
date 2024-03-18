@@ -1,20 +1,23 @@
 #include "GlobalVariable.hpp"
 #include "Instruction.hpp"
 #include "InstructionSelector.hpp"
+#include "MIBuilder.hpp"
+#include "MachineBasicBlock.hpp"
 #include "MachineInstr.hpp"
 #include "Module.hpp"
 #include "Operand.hpp"
+
 #include <memory>
 void InstructionSelector::run() {
     // build module, functions and basic blocks
-    module = std::make_shared<MachineModule>(IR_module);
+    IR_module = module->get_IR_module();
     for (auto &func : IR_module->get_functions()) {
-        auto machine_func = std::make_shared<MachineFunction>(func, module);
+        auto machine_func = std::make_shared<MachineFunction>(&func, module);
         module->add_function(machine_func);
         func_map[&func] = machine_func;
         for (auto &bb : func.get_basic_blocks()) {
             auto machine_bb =
-                std::make_shared<MachineBasicBlock>(bb, machine_func);
+                std::make_shared<MachineBasicBlock>(&bb, machine_func);
             machine_func->add_basic_block(machine_bb);
             bb_map[&bb] = machine_bb;
             context.machine_bb = machine_bb;

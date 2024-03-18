@@ -39,11 +39,10 @@ class MachineFunction : public std::enable_shared_from_this<MachineFunction> {
     }
     Function *get_IR_function() const { return function; }
 
-    virtual void calc_params_schedule();
-    virtual void print() const;
-    virtual std::string get_name() const;
-    virtual std::vector<std::shared_ptr<MachineBasicBlock>>
-    get_basic_blocks() const;
+    void calc_params_schedule();
+    std::string print() const;
+    std::string get_name() const;
+    std::vector<std::shared_ptr<MachineBasicBlock>> get_basic_blocks() const;
 
     std::unique_ptr<FrameScheduler> frame_scheduler;
     struct params_schedule {
@@ -52,9 +51,10 @@ class MachineFunction : public std::enable_shared_from_this<MachineFunction> {
         // offset in stack or register
         int offset;
         std::shared_ptr<PhysicalRegister> reg;
-    } ;
+    };
     std::unordered_map<Value *, params_schedule> params_schedule_map;
     int params_size = 0;
+
   private:
     Function *function;
     std::weak_ptr<MachineModule> parent;
@@ -65,7 +65,7 @@ class MachineFunction : public std::enable_shared_from_this<MachineFunction> {
 
 class FrameScheduler {
   public:
-    int insert_alloca(Value *val) {
+    void insert_alloca(Value *val) {
         auto alloca_inst = static_cast<AllocaInst *>(val);
         frame_size =
             align(frame_size + alloca_inst->get_alloca_type()->get_size(), 16);

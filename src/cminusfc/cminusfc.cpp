@@ -1,5 +1,9 @@
 #include "CodeGen.hpp"
 #include "DeadCode.hpp"
+#include "Instruction.hpp"
+#include "InstructionSelector.hpp"
+#include "MachineModule.hpp"
+#include "MachinePass.hpp"
 #include "Mem2Reg.hpp"
 #include "Module.hpp"
 #include "PassManager.hpp"
@@ -12,7 +16,6 @@
 
 using std::string;
 using namespace std::string_literals;
-
 
 struct Config {
     string exe_name; // compiler exe name
@@ -66,9 +69,14 @@ int main(int argc, char **argv) {
         output_stream << "source_filename = " << abs_path << "\n\n";
         output_stream << m->print();
     } else if (config.emitasm) {
-        CodeGen codegen(m.get());
-        codegen.run();
-        output_stream << codegen.print();
+        // CodeGen codegen(m.get());
+        // codegen.run();
+        // output_stream << codegen.print();
+        auto MM = std::make_shared<MachineModule>(m.get());
+        auto MPM = std::make_shared<MachinePassManager>(MM);
+        MPM->add_pass<InstructionSelector>();
+        MPM->run();
+        output_stream << MM->print();
     }
     return 0;
 }

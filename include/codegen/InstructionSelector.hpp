@@ -1,3 +1,4 @@
+#pragma once
 #include "BasicBlock.hpp"
 #include "Function.hpp"
 #include "MIBuilder.hpp"
@@ -9,9 +10,8 @@
 #include <memory>
 class InstructionSelector : public MachinePass {
   public:
-    InstructionSelector(std::shared_ptr<MachineModule> machine_module,
-                        Module *IR_module)
-        : MachinePass(machine_module), IR_module(IR_module) {}
+    InstructionSelector(std::shared_ptr<MachineModule> machine_module)
+        : MachinePass(machine_module) {}
     void run() override;
 
   private:
