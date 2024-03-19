@@ -55,9 +55,9 @@ std::string MachineModule::global_var_print() const {
             continue;
         auto size = global.get_type()->get_pointer_element_type()->get_size();
         ret += "\t.globl " + global.get_name() + "\n";
-        ret += "\t.type" + global.get_name() + ", @object\n";
+        ret += "\t.type " + global.get_name() + ", @object\n";
         ret +=
-            "\t.size" + global.get_name() + ", " + std::to_string(size) + "\n";
+            "\t.size " + global.get_name() + ", " + std::to_string(size) + "\n";
         ret += global.get_name() + ":\n";
         ret += "\t.space " + std::to_string(size) + "\n";
     }

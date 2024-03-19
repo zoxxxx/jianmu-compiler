@@ -13,6 +13,7 @@ class InstructionSelector : public MachinePass {
   public:
     InstructionSelector(std::shared_ptr<MachineModule> machine_module)
         : MachinePass(machine_module) {}
+    ~InstructionSelector() override = default;
     void run() override;
 
   private:

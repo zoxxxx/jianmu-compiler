@@ -14,6 +14,7 @@ class FrameScheduler;
 class MachineModule;
 class MachineBasicBlock;
 class PhysicalRegister;
+class Register;
 class MachineFunction : public std::enable_shared_from_this<MachineFunction> {
   public:
     MachineFunction(Function *function, std::weak_ptr<MachineModule> parent)

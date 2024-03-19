@@ -8,6 +8,7 @@
 class MachinePass {
   public:
     MachinePass(std::shared_ptr<MachineModule> module) : module(module) {}
+    virtual ~MachinePass() = default;
     virtual void run() = 0;
   protected:
     std::shared_ptr<MachineModule> module;

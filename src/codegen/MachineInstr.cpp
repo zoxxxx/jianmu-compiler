@@ -179,3 +179,61 @@ std::shared_ptr<Register> MachineInstr::get_dst() const {
            "Destination operand is not a register!");
     return std::dynamic_pointer_cast<Register>(operands[0]);
 }
+
+std::vector<std::shared_ptr<Register>> MachineInstr::get_use() const {
+    std::vector<std::shared_ptr<Register>> uses;
+    if (tag == Tag::BL) {
+        auto mf = std::dynamic_pointer_cast<Label>(operands[0])
+                      ->get_function()
+                      .lock();
+        for (auto &arg : mf->get_IR_function()->get_args()) {
+            if (!mf->params_schedule_map[&arg].on_stack) {
+                uses.push_back(std::dynamic_pointer_cast<Register>(
+                    mf->params_schedule_map[&arg].reg));
+            }
+        }
+        return uses;
+    }
+    if (tag == Tag::JR) {
+        for (auto reg : PhysicalRegister::callee_saved_regs()) {
+            uses.push_back(reg);
+        }
+        auto type = this->get_parent()
+                        .lock() // machine basic block
+                        ->get_parent()
+                        .lock()             // machine function
+                        ->get_IR_function() // ir function
+                        ->get_return_type();
+        if (type->is_integer_type()) {
+            uses.push_back(PhysicalRegister::a(0));
+        } else if (type->is_float_type()) {
+            uses.push_back(PhysicalRegister::fa(0));
+        }
+        return uses;
+    }
+    for (auto &operand : operands) {
+        if (has_dst() && operand == operands[0])
+            continue;
+        if (operand == PhysicalRegister::zero())
+            continue;
+        if (std::dynamic_pointer_cast<Register>(operand) != nullptr) {
+            uses.push_back(std::dynamic_pointer_cast<Register>(operand));
+        }
+    }
+    return uses;
+}
+
+std::vector<std::shared_ptr<Register>> MachineInstr::get_def() const {
+    std::vector<std::shared_ptr<Register>> defs;
+    if (tag == Tag::BL) {
+        for (auto reg : PhysicalRegister::caller_saved_regs()) {
+            defs.push_back(reg);
+        }
+        defs.push_back(PhysicalRegister::ra());
+        return defs;
+    }
+    if (has_dst() && get_dst() != PhysicalRegister::zero()) {
+        defs.push_back(get_dst());
+    }
+    return defs;
+}

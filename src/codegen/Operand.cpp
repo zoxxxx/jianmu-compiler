@@ -1,8 +1,15 @@
 #include "MachineBasicBlock.hpp"
 #include "Operand.hpp"
+#include <memory>
 
 Label::Label(std::weak_ptr<MachineBasicBlock> block) {
     name = block.lock()->get_name();
+    this->block = block;
+}
+
+Label::Label(std::weak_ptr<MachineFunction> func) {
+    name = func.lock()->get_name();
+    this->func = func;
 }
 
 std::shared_ptr<Immediate> Immediate::create(int value) {
@@ -36,6 +43,7 @@ std::string VirtualRegister::get_name() const {
 std::vector<std::shared_ptr<PhysicalRegister>>
 PhysicalRegister::callee_saved_regs() {
     std::vector<std::shared_ptr<PhysicalRegister>> regs;
+    regs.push_back(ra());
     for (int i = 0; i <= 7; i++) {
         regs.push_back(s(i));
     }

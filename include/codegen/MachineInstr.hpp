@@ -104,6 +104,9 @@ class MachineInstr : public std::enable_shared_from_this<MachineInstr> {
                  std::vector<std::shared_ptr<Operand>> operands,
                  Suffix suffix = Suffix::NONE)
         : parent(parent), suffix(suffix), tag(tag), operands(operands) {}
+    
+    std::vector<std::shared_ptr<Register>> get_use() const;
+    std::vector<std::shared_ptr<Register>> get_def() const;
 
   private:
     std::shared_ptr<MachineBasicBlock> parent;

@@ -80,11 +80,6 @@ void InstructionSelector::run() {
             for (auto &succ : bb.get_succ_basic_blocks()) {
                 context.machine_bb->add_succ_basic_block(bb_map[succ]);
             }
-            if (bb.get_instructions().back().get_instr_type() ==
-                Instruction::ret) {
-                context.machine_bb->add_succ_basic_block(
-                    func_map[&func]->get_epilogue_block());
-            }
         }
     }
 
@@ -127,19 +122,33 @@ void InstructionSelector::run() {
                 gen_inst();
             }
         }
+
+        // gen prologue and epilogue
         auto prologue_mbb =
             std::make_shared<MachineBasicBlock>(nullptr, machine_func, "");
         auto epilogue_mbb =
             std::make_shared<MachineBasicBlock>(nullptr, machine_func, "_exit");
+
         machine_func->set_prologue_block(prologue_mbb);
         machine_func->set_epilogue_block(epilogue_mbb);
-        machine_func->add_basic_block(prologue_mbb);
-        machine_func->add_basic_block(epilogue_mbb);
-        builder.gen_prologue_epilogue(machine_func);
+
         auto entry_mbb =
             bb_map[machine_func->get_IR_function()->get_entry_block()];
         machine_func->get_prologue_block()->add_succ_basic_block(entry_mbb);
         entry_mbb->add_pre_basic_block(machine_func->get_prologue_block());
+
+        for(auto &bb: machine_func->get_basic_blocks()){
+            if(bb->get_IR_basic_block()->get_instructions().back().get_instr_type() == Instruction::ret){
+                bb->add_succ_basic_block(machine_func->get_epilogue_block());
+                machine_func->get_epilogue_block()->add_pre_basic_block(bb);
+            }
+        }
+
+        machine_func->add_basic_block(prologue_mbb);
+        machine_func->add_basic_block(epilogue_mbb);
+
+        builder.gen_prologue_epilogue(machine_func);
+
     }
 }
 
@@ -556,26 +565,10 @@ void InstructionSelector::gen_call() {
                 assert(false);
         }
     }
-    std::unordered_map<std::shared_ptr<PhysicalRegister>,
-                       std::shared_ptr<VirtualRegister>>
-        reg_map;
-    reg_map.clear();
-    for (auto reg : PhysicalRegister::caller_saved_regs()) {
-        if (reg->get_type() == Register::General)
-            reg_map[reg] = VirtualRegister::create(Register::General);
-        else if (reg->get_type() == Register::Float)
-            reg_map[reg] = VirtualRegister::create(Register::Float);
-        else if (reg->get_type() == Register::FloatCmp)
-            reg_map[reg] = VirtualRegister::create(Register::FloatCmp);
-        builder.append_instr(context.machine_bb, MachineInstr::Tag::MOV,
-                             {reg_map[reg], reg});
-    }
+
     builder.append_instr(context.machine_bb, MachineInstr::Tag::BL,
-                         {std::make_shared<Label>(mf->get_name())});
-    for (auto reg : PhysicalRegister::caller_saved_regs()) {
-        builder.append_instr(context.machine_bb, MachineInstr::Tag::MOV,
-                             {reg, reg_map[reg]});
-    }
+                         {std::make_shared<Label>(mf)});
+
     builder.add_int_to_reg(context.machine_bb, PhysicalRegister::sp(),
                            PhysicalRegister::sp(), mf->params_size);
     if (not callInst->get_type()->is_void_type()) {

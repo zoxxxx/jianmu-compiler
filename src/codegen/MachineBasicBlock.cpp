@@ -1,6 +1,8 @@
 
 #include "MachineBasicBlock.hpp"
 #include "MachineFunction.hpp"
+#include "Operand.hpp"
+#include <cassert>
 #include <memory>
 MachineBasicBlock::MachineBasicBlock(BasicBlock *IR_bb,
                                      std::weak_ptr<MachineFunction> parent,
@@ -14,6 +16,20 @@ MachineBasicBlock::MachineBasicBlock(BasicBlock *IR_bb,
     }
 }
 
+std::vector<std::weak_ptr<MachineBasicBlock>> &
+MachineBasicBlock::get_succ_basic_blocks() {
+    return succs;
+}
+
+std::vector<std::weak_ptr<MachineBasicBlock>> &
+MachineBasicBlock::get_pre_basic_blocks() {
+    return preds;
+}
+
+std::weak_ptr<MachineFunction> MachineBasicBlock::get_parent() const {
+    return parent;
+}
+
 void MachineBasicBlock::insert_instr(
     std::shared_ptr<MachineInstr> instr,
     std::vector<std::shared_ptr<MachineInstr>>::iterator it) {
@@ -25,10 +41,12 @@ void MachineBasicBlock::append_instr(std::shared_ptr<MachineInstr> instr) {
 void MachineBasicBlock::clear_instrs() { instrs.clear(); }
 void MachineBasicBlock::add_succ_basic_block(
     std::weak_ptr<MachineBasicBlock> succ) {
+    assert(succ.lock() != nullptr && "succ is nullptr");
     succs.push_back(succ);
 }
 void MachineBasicBlock::add_pre_basic_block(
     std::weak_ptr<MachineBasicBlock> pred) {
+    assert(pred.lock() != nullptr && "pred is nullptr");
     preds.push_back(pred);
 }
 std::vector<std::shared_ptr<MachineInstr>> &MachineBasicBlock::get_instrs() {
@@ -46,4 +64,36 @@ std::string MachineBasicBlock::print() const {
         ret += "\t" + instr->print();
     }
     return ret;
+}
+
+RegisterSet MachineBasicBlock::get_def() {
+    RegisterSet uses;
+    RegisterSet defs;
+    for (auto &instr : instrs) {
+        for (auto &use : instr->get_use()) {
+            uses.insert(use);
+        }
+        for (auto &def : instr->get_def()) {
+            if (uses.find(def) == uses.end()) {
+                defs.insert(def);
+            }
+        }
+    }
+    return defs;
+}
+
+RegisterSet MachineBasicBlock::get_use() {
+    RegisterSet uses;
+    RegisterSet defs;
+    for (auto &instr : instrs) {
+        for (auto &use : instr->get_use()) {
+            if (defs.find(use) == defs.end()) {
+                uses.insert(use);
+            }
+        }
+        for (auto &def : instr->get_def()) {
+            defs.insert(def);
+        }
+    }
+    return uses;
 }

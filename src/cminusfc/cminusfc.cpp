@@ -2,6 +2,7 @@
 #include "DeadCode.hpp"
 #include "Instruction.hpp"
 #include "InstructionSelector.hpp"
+#include "LivenessAnalysis.hpp"
 #include "MachineModule.hpp"
 #include "MachinePass.hpp"
 #include "Mem2Reg.hpp"
@@ -77,6 +78,9 @@ int main(int argc, char **argv) {
         MPM->add_pass<InstructionSelector>();
         MPM->run();
         output_stream << MM->print();
+        auto live = std::make_shared<LivenessAnalysis>(MM);
+        live->run();
+        output_stream << live->print(); 
     }
     return 0;
 }

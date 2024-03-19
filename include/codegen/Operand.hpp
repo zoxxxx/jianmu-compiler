@@ -1,7 +1,9 @@
 #pragma once
 
+#include "Function.hpp"
 #include "GlobalVariable.hpp"
 #include "MachineBasicBlock.hpp"
+#include "MachineFunction.hpp"
 
 #include <cassert>
 #include <functional>
@@ -12,7 +14,9 @@
 class VirtualRegister;
 class PhysicalRegister;
 class MachineBasicBlock;
+class MachineFunction;
 class Immediate;
+
 class Operand : public std::enable_shared_from_this<Operand> {
   public:
     virtual ~Operand() = default;
@@ -238,10 +242,21 @@ class Label : public Operand {
   public:
     Label(std::string name) : name(name) {}
     Label(std::weak_ptr<MachineBasicBlock> block);
+    Label(std::weak_ptr<MachineFunction> function);
     ~Label() override = default;
     bool is_label() const override final { return true; }
     std::string get_name() const override final { return name; }
+    std::weak_ptr<MachineBasicBlock> get_block() const {
+        assert(!block.expired());
+        return block;
+    }
+    std::weak_ptr<MachineFunction> get_function() const {
+        assert(!func.expired());
+        return func;
+    }
 
   private:
+    std::weak_ptr<MachineBasicBlock> block;
+    std::weak_ptr<MachineFunction> func;
     std::string name;
 };
