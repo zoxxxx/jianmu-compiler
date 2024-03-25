@@ -9,7 +9,9 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <utility>
+#include <unordered_set>
 
 class VirtualRegister;
 class PhysicalRegister;
@@ -40,12 +42,13 @@ class Register : public Operand {
     bool is_using_sp_as_frame_reg() const {
         return flags & kUSING_SP_AS_FRAME_REG;
     }
-
+    static std::unordered_map<std::shared_ptr<VirtualRegister>, std::shared_ptr<PhysicalRegister>> color;
   protected:
     RegisterType type;
     unsigned flags;
 };
 
+using RegisterSet = std::unordered_set<std::shared_ptr<Register>>;
 class RegisterFactory {
   public:
     static RegisterFactory &get_instance() {
@@ -202,6 +205,37 @@ class PhysicalRegister : public Register {
         assert(i < 8);
         return RegisterFactory::get_instance().get_register(
             Register::RegisterType::FloatCmp, i);
+    }
+
+    static RegisterSet allocatable_general() {
+        RegisterSet ret;
+        ret.insert(ra());
+        for(int i = 0; i < 8; i++) {
+            ret.insert(a(i));
+        }
+        for(int i = 0; i < 9; i++) {
+            ret.insert(t(i));
+        }
+        for(int i = 0; i < 9; i++) {
+            ret.insert(s(i));
+        }
+        return ret;
+    }
+
+    static RegisterSet allocatable_float() {
+        RegisterSet ret;
+        for (int i = 0; i < 32; i++) {
+            ret.insert(f(i));
+        }
+        return ret;
+    }
+
+    static RegisterSet allocatable_fcc() {
+        RegisterSet ret;
+        for (int i = 0; i < 8; i++) {
+            ret.insert(fcc(i));
+        }
+        return ret;
     }
 
     static std::vector<std::shared_ptr<PhysicalRegister>> callee_saved_regs();

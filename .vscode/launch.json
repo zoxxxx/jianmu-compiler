@@ -4,12 +4,13 @@
     // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
             "program": "cminusfc",
-            "args": ["/home/zox/compiler/2023ustc-jianmu-compiler/test.sy", "-mem2reg", "-emit-llvm", "-o", "/home/zox/compiler/2023ustc-jianmu-compiler/test.ll"],
+            "args": ["/home/zox/compiler/2023ustc-jianmu-compiler/tests/functional/00_main.sy", "-mem2reg", "-S", "-o", "/home/zox/compiler/2023ustc-jianmu-compiler/tests/output/00_main.s"],
             "cwd": "${workspaceFolder}/build",
         },
         {

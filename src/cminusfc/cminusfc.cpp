@@ -7,7 +7,9 @@
 #include "MachinePass.hpp"
 #include "Mem2Reg.hpp"
 #include "Module.hpp"
+#include "Operand.hpp"
 #include "PassManager.hpp"
+#include "RegisterAllocation.hpp"
 #include "cminusf_builder.hpp"
 
 #include <filesystem>
@@ -76,11 +78,9 @@ int main(int argc, char **argv) {
         auto MM = std::make_shared<MachineModule>(m.get());
         auto MPM = std::make_shared<MachinePassManager>(MM);
         MPM->add_pass<InstructionSelector>();
+        MPM->add_pass<RegisterAllocation>();
         MPM->run();
         output_stream << MM->print();
-        auto live = std::make_shared<LivenessAnalysis>(MM);
-        live->run();
-        output_stream << live->print(); 
     }
     return 0;
 }

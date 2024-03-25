@@ -2,6 +2,7 @@
 #include "MachineInstr.hpp"
 #include "Operand.hpp"
 #include "ast.hpp"
+#include <cstddef>
 #include <memory>
 
 std::string get_tag_name(MachineInstr::Tag tag) {
@@ -140,7 +141,31 @@ std::string get_suffix_name(MachineInstr::Suffix suffix) {
     }
 }
 
+std::string MachineInstr::print_mov() const {
+    if (operands[0] == operands[1]) {
+        return "";
+    }
+    if (operands[0] == PhysicalRegister::zero()) {
+        return "";
+    }
+    auto type = std::dynamic_pointer_cast<Register>(operands[0])->get_type();
+    if (type == Register::RegisterType::Float) {
+        return "fmov.s " + operands[0]->get_name() + ", " +
+               operands[1]->get_name() + "\n";
+    }
+    if (type == Register::RegisterType::General) {
+        return "ori " + operands[0]->get_name() + ", " +
+               operands[1]->get_name() + ", 0\n";
+    }
+    if (type == Register::RegisterType::FloatCmp) {
+        assert(false && "FloatCmp register should not be moved");
+        return "";
+    }
+    return "";
+}
 std::string MachineInstr::print() const {
+    if (tag == Tag::MOV)
+        return print_mov();
     std::string res = get_tag_name(tag);
     res += get_suffix_name(suffix);
     res += " ";
@@ -180,7 +205,7 @@ std::shared_ptr<Register> MachineInstr::get_dst() const {
     return std::dynamic_pointer_cast<Register>(operands[0]);
 }
 
-std::vector<std::shared_ptr<Register>> MachineInstr::get_use() const {
+std::vector<std::shared_ptr<Register>> MachineInstr::get_use() {
     std::vector<std::shared_ptr<Register>> uses;
     if (tag == Tag::BL) {
         auto mf = std::dynamic_pointer_cast<Label>(operands[0])
@@ -223,7 +248,7 @@ std::vector<std::shared_ptr<Register>> MachineInstr::get_use() const {
     return uses;
 }
 
-std::vector<std::shared_ptr<Register>> MachineInstr::get_def() const {
+std::vector<std::shared_ptr<Register>> MachineInstr::get_def() {
     std::vector<std::shared_ptr<Register>> defs;
     if (tag == Tag::BL) {
         for (auto reg : PhysicalRegister::caller_saved_regs()) {
@@ -236,4 +261,35 @@ std::vector<std::shared_ptr<Register>> MachineInstr::get_def() const {
         defs.push_back(get_dst());
     }
     return defs;
+}
+
+void MachineInstr::replace_def(std::shared_ptr<Register> old_reg,
+                               std::shared_ptr<Register> new_reg) {
+    if (has_dst() && get_dst() == old_reg) {
+        operands[0] = new_reg;
+    }
+}
+
+void MachineInstr::replace_use(std::shared_ptr<Register> old_reg,
+                               std::shared_ptr<Register> new_reg) {
+    size_t begin = has_dst() ? 1 : 0;
+    for (size_t i = begin; i < operands.size(); i++) {
+        if (operands[i] == old_reg) {
+            operands[i] = new_reg;
+        }
+    }
+}
+
+void MachineInstr::colorize() {
+    for (auto &operand : operands) {
+        if (std::dynamic_pointer_cast<VirtualRegister>(operand) == nullptr)
+            continue;
+        auto vr = std::dynamic_pointer_cast<VirtualRegister>(operand);
+        auto it = Register::color.find(vr);
+        if (it != Register::color.end() && it->second != nullptr) {
+            operand = it->second;
+        } else {
+            assert(false && "Virtual register not colored");
+        }
+    }
 }

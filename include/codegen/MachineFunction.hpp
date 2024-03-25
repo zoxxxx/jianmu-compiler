@@ -6,6 +6,7 @@
 #include "Module.hpp"
 #include "Operand.hpp"
 #include "Value.hpp"
+#include <cstddef>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -72,12 +73,12 @@ class FrameScheduler {
             align(frame_size + alloca_inst->get_alloca_type()->get_size(), 16);
         alloca_map[val] = frame_size;
     }
-    void insert_reg(std::shared_ptr<Register> reg, int size) {
-        frame_size = align(frame_size + size, size);
+    void insert_reg(std::shared_ptr<Register> reg) {
+        frame_size = align(frame_size + 8, 8);
         reg_map[reg] = frame_size;
     }
-    int get_alloca_offset(Value *val) { return alloca_map[val]; }
-    int get_reg_offset(std::shared_ptr<Register> reg) { return reg_map[reg]; }
+    int get_alloca_offset(Value *val) { return -alloca_map[val]; }
+    int get_reg_offset(std::shared_ptr<Register> reg) { return -reg_map[reg]; }
     int get_frame_size() {
         frame_size = align(frame_size, 16);
         return frame_size;

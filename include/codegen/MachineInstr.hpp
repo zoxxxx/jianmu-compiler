@@ -99,15 +99,19 @@ class MachineInstr : public std::enable_shared_from_this<MachineInstr> {
     Suffix get_suffix() const { return suffix; }
 
     std::string print() const;
+    std::string print_mov() const;
 
     MachineInstr(std::weak_ptr<MachineBasicBlock> parent, Tag tag,
                  std::vector<std::shared_ptr<Operand>> operands,
                  Suffix suffix = Suffix::NONE)
         : parent(parent), suffix(suffix), tag(tag), operands(operands) {}
     
-    std::vector<std::shared_ptr<Register>> get_use() const;
-    std::vector<std::shared_ptr<Register>> get_def() const;
+    std::vector<std::shared_ptr<Register>> get_use() ;
+    std::vector<std::shared_ptr<Register>> get_def() ;
+    void replace_def(std::shared_ptr<Register> old_reg, std::shared_ptr<Register> new_reg);
+    void replace_use(std::shared_ptr<Register> old_reg, std::shared_ptr<Register> new_reg);
 
+    void colorize();
   private:
     std::shared_ptr<MachineBasicBlock> parent;
     std::string comment;

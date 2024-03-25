@@ -1,6 +1,12 @@
 #include "MachineBasicBlock.hpp"
 #include "Operand.hpp"
+#include <cassert>
 #include <memory>
+#include <unordered_map>
+
+std::unordered_map<std::shared_ptr<VirtualRegister>,
+                   std::shared_ptr<PhysicalRegister>>
+    Register::color = {};
 
 Label::Label(std::weak_ptr<MachineBasicBlock> block) {
     name = block.lock()->get_name();
@@ -78,17 +84,36 @@ PhysicalRegister::caller_saved_regs() {
 }
 
 std::string PhysicalRegister::get_name() const {
-    std::string ret = "$";
-    switch (type) {
-    case RegisterType::General:
-        ret += "r";
-        break;
-    case RegisterType::Float:
-        ret += "f";
-        break;
-    case RegisterType::FloatCmp:
-        ret += "fcc";
-        break;
+    if(type == RegisterType::General) {
+        if(id == 0) 
+            return "$zero";
+        else if(id == 1)
+            return "$ra";
+        else if(id == 3)
+            return "$sp";
+        else if(id >= 4 && id <= 11) 
+            return "$a" + std::to_string(id - 4);
+        else if(id >= 12 && id <= 20) 
+            return "$t" + std::to_string(id - 12);
+        else if(id == 22) 
+            return "$fp";
+        else if(id >= 23 && id <= 31) 
+            return "$s" + std::to_string(id - 23);
+        else assert(false);
     }
-    return ret + std::to_string(id);
+    else if(type == RegisterType::Float) {
+        if(id < 8) 
+            return "$fa" + std::to_string(id);
+        else if(id < 24) 
+            return "$ft" + std::to_string(id - 8);
+        else if(id < 32)
+            return "$fs" + std::to_string(id - 24);
+        else assert(false);
+    }
+    else if(type == RegisterType::FloatCmp) {
+        return "$fcc" + std::to_string(id);
+    }
+    else {
+        assert(false);
+    }
 }

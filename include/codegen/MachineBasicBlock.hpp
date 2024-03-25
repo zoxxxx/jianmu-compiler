@@ -7,12 +7,11 @@
 #include "Operand.hpp"
 
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
-using RegisterSet = std::set<std::shared_ptr<Register>,
-                             std::owner_less<std::shared_ptr<Register>>>;
-using MBBSetMap = std::map<std::shared_ptr<MachineBasicBlock>, RegisterSet,
-                           std::owner_less<std::shared_ptr<MachineBasicBlock>>>;
+using RegisterSet = std::unordered_set<std::shared_ptr<Register>>;
+using MBBSetMap = std::unordered_map<std::shared_ptr<MachineBasicBlock>, RegisterSet>;
 
 class Operand;
 class MachineInstr;

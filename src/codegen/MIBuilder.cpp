@@ -9,6 +9,7 @@
 #include <initializer_list>
 #include <iterator>
 #include <memory>
+#include <cstring>
 
 std::shared_ptr<MachineInstr> MIBuilder::append_instr(
     std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
@@ -92,7 +93,11 @@ void MIBuilder::load_int64(std::shared_ptr<MachineBasicBlock> mbb, int64_t val,
 void MIBuilder::load_float(std::shared_ptr<MachineBasicBlock> mbb, float val,
                            std::shared_ptr<Register> reg) {
     auto tmp_reg = VirtualRegister::create(Register::General);
-    load_int32(mbb, *reinterpret_cast<int32_t *>(&val), tmp_reg);
+    
+    int32_t temp;
+    memcpy(&temp, &val, sizeof(int32_t));
+    load_int32(mbb, temp, tmp_reg);
+
     append_instr(mbb, MachineInstr::Tag::MOVGR2FR_W, {reg, tmp_reg});
 }
 

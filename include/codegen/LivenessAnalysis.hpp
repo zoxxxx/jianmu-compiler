@@ -1,3 +1,5 @@
+#pragma once
+
 #include "BasicBlock.hpp"
 #include "MachineModule.hpp"
 #include "MachinePass.hpp"
@@ -9,10 +11,11 @@ class LivenessAnalysis : public MachinePass {
   public:
     LivenessAnalysis(std::shared_ptr<MachineModule> MM) : MachinePass(MM) {}
     ~LivenessAnalysis() override = default;
+    void run_on_func(std::shared_ptr<MachineFunction> func);
     void run() override;
     std::string print();
-    RegisterSet &get_live_in(std::shared_ptr<MachineBasicBlock> block);
-    RegisterSet &get_live_out(std::shared_ptr<MachineBasicBlock> block);
+    RegisterSet get_live_in(std::shared_ptr<MachineBasicBlock> block);
+    RegisterSet get_live_out(std::shared_ptr<MachineBasicBlock> block);
 
   private:
     MBBSetMap live_in;

@@ -61,7 +61,8 @@ std::string MachineBasicBlock::print() const {
     std::string ret;
     ret += get_name() + ":\n";
     for (auto &instr : instrs) {
-        ret += "\t" + instr->print();
+        if(instr->print() != "")
+            ret += "\t" + instr->print();
     }
     return ret;
 }
