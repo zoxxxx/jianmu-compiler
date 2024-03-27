@@ -8,6 +8,7 @@
 #include "Type.hpp"
 #include <cassert>
 #include <initializer_list>
+#include <iostream>
 #include <memory>
 #include <typeindex>
 #include <unordered_map>
@@ -59,39 +60,31 @@ class InstructionChecker {
 class MIBuilder {
   private:
   public:
+    unsigned flag = 0;
+    std::shared_ptr<MachineBasicBlock> mbb;
+    std::list<std::shared_ptr<MachineInstr>>::iterator it;
+    void set_flag(unsigned flag) { this->flag = flag; }
+    void
+    set_insert_point(std::shared_ptr<MachineBasicBlock> mbb,
+                     std::list<std::shared_ptr<MachineInstr>>::iterator it);
+    std::list<std::shared_ptr<MachineInstr>>::iterator get_insert_point();
     std::shared_ptr<MachineInstr>
-    append_instr(std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
+    insert_instr(MachineInstr::Tag tag,
                  std::initializer_list<std::shared_ptr<Operand>> operands,
                  MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
-    std::shared_ptr<MachineInstr>
-    insert_instr(std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
-                 std::initializer_list<std::shared_ptr<Operand>> operands,
-                 std::vector<std::shared_ptr<MachineInstr>>::iterator it,
-                 MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
-    std::shared_ptr<MachineInstr> insert_instr_before_b(
-        std::shared_ptr<MachineBasicBlock> mbb, MachineInstr::Tag tag,
-        std::initializer_list<std::shared_ptr<Operand>> operands,
-        MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
-    void load_int32(std::shared_ptr<MachineBasicBlock> mbb, int32_t val,
-                          std::shared_ptr<Register> reg);
-    void load_int64(std::shared_ptr<MachineBasicBlock> mbb, int64_t val,
-                          std::shared_ptr<Register> reg);
-    void load_float(std::shared_ptr<MachineBasicBlock> mbb, float val,
-                          std::shared_ptr<Register> reg);
-    void add_int_to_reg(std::shared_ptr<MachineBasicBlock> mbb,
-                        std::shared_ptr<Register> dst,
+
+    void load_int32(int32_t val, std::shared_ptr<Register> reg);
+    void load_int64(int64_t val, std::shared_ptr<Register> reg);
+    void load_float(float val, std::shared_ptr<Register> reg);
+    void add_int_to_reg(std::shared_ptr<Register> dst,
                         std::shared_ptr<Register> src, int64_t imm);
     void
-    store_to_stack(std::shared_ptr<MachineBasicBlock> mbb,
-                   std::shared_ptr<Register> reg, std::shared_ptr<Register> ptr,
+    store_to_stack(std::shared_ptr<Register> reg, std::shared_ptr<Register> ptr,
                    int offset,
                    MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
     void
-    load_from_stack(std::shared_ptr<MachineBasicBlock> mbb,
-                    std::shared_ptr<Register> reg,
+    load_from_stack(std::shared_ptr<Register> reg,
                     std::shared_ptr<Register> ptr, int offset,
                     MachineInstr::Suffix suffix = MachineInstr::Suffix::NONE);
 
-    void gen_prologue_epilogue(std::shared_ptr<MachineFunction> MF);
-    void gen_allocate(std::shared_ptr<MachineFunction> MF);
 };

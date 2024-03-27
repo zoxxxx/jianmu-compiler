@@ -1,14 +1,15 @@
 #pragma once
-#include "BasicBlock.hpp"
-#include "Function.hpp"
 #include "MIBuilder.hpp"
-#include "MachineFunction.hpp"
-#include "MachineInstr.hpp"
 #include "MachinePass.hpp"
-#include "Module.hpp"
-#include "Operand.hpp"
+
 #include <cassert>
+#include <cstddef>
 #include <memory>
+#include <unordered_map>
+
+class MachineModule;
+class MIBuilder;
+
 class InstructionSelector : public MachinePass {
   public:
     InstructionSelector(std::shared_ptr<MachineModule> machine_module)
@@ -21,6 +22,7 @@ class InstructionSelector : public MachinePass {
 
     void gen_store_params();
     void set_all_regs();
+    void gen_prologue_epilogue();
 
     void gen_ret();
     void gen_br();
@@ -39,7 +41,7 @@ class InstructionSelector : public MachinePass {
     void gen_bitcast();
     void gen_phi();
 
-    std::shared_ptr<Register> get_reg(Value *val) ;
+    std::shared_ptr<Register> get_reg(Value *val);
     void set_reg(Value *val, std::shared_ptr<Register> reg);
     struct {
         std::shared_ptr<MachineFunction> machine_func;           // 当前函数
@@ -54,10 +56,9 @@ class InstructionSelector : public MachinePass {
         }
 
     } context;
-    
+
     std::unordered_map<Value *, std::shared_ptr<Register>> val_map{};
     Module *IR_module;
-    MIBuilder builder;
-    std::map<Function *, std::shared_ptr<MachineFunction>> func_map;
-    std::map<BasicBlock *, std::shared_ptr<MachineBasicBlock>> bb_map;
+    std::unordered_map<Function *, std::shared_ptr<MachineFunction>> func_map;
+    std::unordered_map<BasicBlock *, std::shared_ptr<MachineBasicBlock>> bb_map;
 };

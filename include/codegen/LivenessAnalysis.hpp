@@ -1,11 +1,17 @@
 #pragma once
-
-#include "BasicBlock.hpp"
-#include "MachineModule.hpp"
 #include "MachinePass.hpp"
-#include "Operand.hpp"
-#include <memory>
 
+#include <memory>
+#include <unordered_map>
+#include <unordered_set>
+
+
+class Register;
+class MachineBasicBlock;
+class MachineFunction;
+class MachineModule;
+using RegisterSet = std::unordered_set<std::shared_ptr<Register>>;
+using MBBSetMap = std::unordered_map<std::shared_ptr<MachineBasicBlock>, RegisterSet>;
 
 class LivenessAnalysis : public MachinePass {
   public:

@@ -1,4 +1,5 @@
 #include "MachineBasicBlock.hpp"
+#include "MachineFunction.hpp"
 #include "Operand.hpp"
 #include <cassert>
 #include <memory>
@@ -7,6 +8,7 @@
 std::unordered_map<std::shared_ptr<VirtualRegister>,
                    std::shared_ptr<PhysicalRegister>>
     Register::color = {};
+std::unordered_set<std::shared_ptr<VirtualRegister>> Register::temp_regs = {};
 
 Label::Label(std::weak_ptr<MachineBasicBlock> block) {
     name = block.lock()->get_name();
@@ -19,7 +21,7 @@ Label::Label(std::weak_ptr<MachineFunction> func) {
 }
 
 std::shared_ptr<Immediate> Immediate::create(int value) {
-    static std::map<int, std::shared_ptr<Immediate>> pool;
+    static std::unordered_map<int, std::shared_ptr<Immediate>> pool;
     auto it = pool.find(value);
     if (it != pool.end()) {
         return it->second;
@@ -50,7 +52,7 @@ std::vector<std::shared_ptr<PhysicalRegister>>
 PhysicalRegister::callee_saved_regs() {
     std::vector<std::shared_ptr<PhysicalRegister>> regs;
     regs.push_back(ra());
-    for (int i = 0; i <= 7; i++) {
+    for (int i = 0; i <= 8; i++) {
         regs.push_back(s(i));
     }
 
@@ -84,36 +86,35 @@ PhysicalRegister::caller_saved_regs() {
 }
 
 std::string PhysicalRegister::get_name() const {
-    if(type == RegisterType::General) {
-        if(id == 0) 
+    if (type == RegisterType::General) {
+        if (id == 0)
             return "$zero";
-        else if(id == 1)
+        else if (id == 1)
             return "$ra";
-        else if(id == 3)
+        else if (id == 3)
             return "$sp";
-        else if(id >= 4 && id <= 11) 
+        else if (id >= 4 && id <= 11)
             return "$a" + std::to_string(id - 4);
-        else if(id >= 12 && id <= 20) 
+        else if (id >= 12 && id <= 20)
             return "$t" + std::to_string(id - 12);
-        else if(id == 22) 
+        else if (id == 22)
             return "$fp";
-        else if(id >= 23 && id <= 31) 
+        else if (id >= 23 && id <= 31)
             return "$s" + std::to_string(id - 23);
-        else assert(false);
-    }
-    else if(type == RegisterType::Float) {
-        if(id < 8) 
+        else
+            assert(false);
+    } else if (type == RegisterType::Float) {
+        if (id < 8)
             return "$fa" + std::to_string(id);
-        else if(id < 24) 
+        else if (id < 24)
             return "$ft" + std::to_string(id - 8);
-        else if(id < 32)
+        else if (id < 32)
             return "$fs" + std::to_string(id - 24);
-        else assert(false);
-    }
-    else if(type == RegisterType::FloatCmp) {
+        else
+            assert(false);
+    } else if (type == RegisterType::FloatCmp) {
         return "$fcc" + std::to_string(id);
-    }
-    else {
+    } else {
         assert(false);
     }
 }

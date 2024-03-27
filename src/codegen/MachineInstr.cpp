@@ -1,6 +1,7 @@
 #include "MachineBasicBlock.hpp"
 #include "MachineInstr.hpp"
 #include "Operand.hpp"
+#include "MachineFunction.hpp"
 #include "ast.hpp"
 #include <cstddef>
 #include <memory>
@@ -190,7 +191,7 @@ bool MachineInstr::has_dst() const {
              tag == Tag::BGE || tag == Tag::BLTU || tag == Tag::BGEU ||
              tag == Tag::BEQZ || tag == Tag::BNEZ || tag == Tag::B ||
              tag == Tag::BL || tag == Tag::BCEQZ || tag == Tag::BCNEZ ||
-             tag == Tag::JR);
+             tag == Tag::JR || tag == Tag::ST || tag == Tag::FST_S);
 }
 
 std::shared_ptr<Operand> MachineInstr::get_operand(unsigned index) const {

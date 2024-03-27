@@ -1,10 +1,5 @@
 #pragma once
 
-#include "Function.hpp"
-#include "GlobalVariable.hpp"
-#include "MachineBasicBlock.hpp"
-#include "MachineFunction.hpp"
-
 #include <cassert>
 #include <functional>
 #include <memory>
@@ -43,6 +38,7 @@ class Register : public Operand {
         return flags & kUSING_SP_AS_FRAME_REG;
     }
     static std::unordered_map<std::shared_ptr<VirtualRegister>, std::shared_ptr<PhysicalRegister>> color;
+    static std::unordered_set<std::shared_ptr<VirtualRegister>> temp_regs;
   protected:
     RegisterType type;
     unsigned flags;
@@ -62,6 +58,7 @@ class RegisterFactory {
             std::make_shared<VirtualRegister>(next_virtual_reg_id, type, flags);
         virtual_regs[next_virtual_reg_id] = reg;
         next_virtual_reg_id++;
+        Register::temp_regs.insert(reg);
         return reg;
     }
 

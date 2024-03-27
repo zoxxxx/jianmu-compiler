@@ -1,16 +1,22 @@
 #pragma once
 
-#include "MachineModule.hpp"
-#include "Module.hpp"
-#include "Operand.hpp"
+#include "MIBuilder.hpp"
 #include <memory>
+#include <vector>
+
+class MachineModule;
+class MachinePass;
+class MIBuilder;
 
 class MachinePass {
   public:
-    MachinePass(std::shared_ptr<MachineModule> module) : module(module) {}
+    MachinePass(std::shared_ptr<MachineModule> module) : module(module) {
+        builder = module->get_builder();  
+    }
     virtual ~MachinePass() = default;
     virtual void run() = 0;
   protected:
+    std::shared_ptr<MIBuilder> builder;
     std::shared_ptr<MachineModule> module;
 };
 

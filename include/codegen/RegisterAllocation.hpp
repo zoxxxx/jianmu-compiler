@@ -1,8 +1,5 @@
-#include "LivenessAnalysis.hpp"
-#include "MIBuilder.hpp"
-#include "MachineBasicBlock.hpp"
-#include "MachineFunction.hpp"
 #include "MachinePass.hpp"
+#include "Operand.hpp"
 
 #include <cstddef>
 #include <memory>
@@ -11,7 +8,15 @@
 #include <unordered_set>
 #include <vector>
 
+class MachineInstr;
+class Register;
+class PhysicalRegister;
+class VirtualRegister;
+class MachineFunction;
+class LivenessAnalysis;
 using MoveSet = std::unordered_set<std::shared_ptr<MachineInstr>>;
+using RegisterSet = std::unordered_set<std::shared_ptr<Register>>;
+
 class RegisterAllocation : public MachinePass {
   public:
     RegisterAllocation(std::shared_ptr<MachineModule> MM) : MachinePass(MM) {
@@ -46,6 +51,7 @@ class RegisterAllocation : public MachinePass {
     void combine(std::shared_ptr<Register> u, std::shared_ptr<Register> v);
     void freeze_moves(std::shared_ptr<Register> u);
     bool conservative(std::shared_ptr<Register>, std::shared_ptr<Register>);
+    void rewrite_prologue();
     
     RegisterSet initial;
     RegisterSet simplify_worklist;
@@ -87,6 +93,4 @@ class RegisterAllocation : public MachinePass {
     size_t float_K;
     size_t general_K;
     size_t fcc_K;
-
-    MIBuilder builder;
 };

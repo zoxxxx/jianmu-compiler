@@ -1,4 +1,6 @@
 #include "MachineModule.hpp"
+#include "Module.hpp"
+#include "MachineFunction.hpp"
 #include <iomanip>
 
 void MachineModule::add_function(std::shared_ptr<MachineFunction> MF) {

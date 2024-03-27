@@ -86,7 +86,14 @@ class MachineInstr : public std::enable_shared_from_this<MachineInstr> {
         BCEQZ,
         BCNEZ
     };
-
+    enum Flag {
+        IS_FUNC_ARGS_SET = 1<<0,
+        IS_FRAME_SET = 1<<1,
+        IS_PHI_MOV = 1<<2,
+    };
+    bool is_func_args_set() const {return flag & Flag::IS_FUNC_ARGS_SET; }
+    bool is_frame_set() const { return flag & Flag::IS_FRAME_SET; }
+    bool is_phi_mov() const { return flag & Flag::IS_PHI_MOV;}
     
     bool has_dst() const;
     std::shared_ptr<Operand> get_operand(unsigned index) const; 
@@ -103,8 +110,8 @@ class MachineInstr : public std::enable_shared_from_this<MachineInstr> {
 
     MachineInstr(std::weak_ptr<MachineBasicBlock> parent, Tag tag,
                  std::vector<std::shared_ptr<Operand>> operands,
-                 Suffix suffix = Suffix::NONE)
-        : parent(parent), suffix(suffix), tag(tag), operands(operands) {}
+                 Suffix suffix, unsigned flag)
+        : flag(flag), parent(parent), suffix(suffix), tag(tag), operands(operands) {}
     
     std::vector<std::shared_ptr<Register>> get_use() ;
     std::vector<std::shared_ptr<Register>> get_def() ;
@@ -113,6 +120,7 @@ class MachineInstr : public std::enable_shared_from_this<MachineInstr> {
 
     void colorize();
   private:
+    unsigned flag;
     std::shared_ptr<MachineBasicBlock> parent;
     std::string comment;
 

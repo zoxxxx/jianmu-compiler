@@ -1,4 +1,6 @@
+#include "LivenessAnalysis.hpp"
 #include "MachineBasicBlock.hpp"
+#include "MachineFunction.hpp"
 #include "Operand.hpp"
 #include "RegisterAllocation.hpp"
 #include <cassert>
@@ -22,6 +24,9 @@ void RegisterAllocation::run_on_func(std::shared_ptr<MachineFunction> func) {
     coalesced_nodes.clear();
     colored_nodes.clear();
     spilled_nodes.clear();
+    select_stack.clear();
+    edges.clear();
+
     bool is_spill = false;
     for (auto &bb : func->get_basic_blocks()) {
         for (auto &instr : bb->get_instrs()) {
@@ -29,11 +34,19 @@ void RegisterAllocation::run_on_func(std::shared_ptr<MachineFunction> func) {
                 if (def->is_virtual_reg())
                     initial.insert(
                         std::dynamic_pointer_cast<VirtualRegister>(def));
+                degree[def] = 0;
+                move_list[def] = MoveSet();
+                graph[def] = RegisterSet();
+                alias[def] = def;
             }
             for (auto &use : instr->get_use()) {
                 if (use->is_virtual_reg())
                     initial.insert(
                         std::dynamic_pointer_cast<VirtualRegister>(use));
+                degree[use] = 0;
+                move_list[use] = MoveSet();
+                graph[use] = RegisterSet();
+                alias[use] = use;
             }
         }
     }
@@ -362,14 +375,12 @@ void RegisterAllocation::assign_colors() {
         }
         for (auto &w : graph[reg]) {
             auto alias_w = get_alias(w);
-            if (colored_nodes.find(alias_w) != colored_nodes.end() &&
-                !alias_w->is_physical_reg()) {
+            if (alias_w->is_physical_reg()) {
+                ok_colors.erase(alias_w);
+            } else if (colored_nodes.find(alias_w) != colored_nodes.end())
                 ok_colors.erase(
                     Register::color[std::dynamic_pointer_cast<VirtualRegister>(
                         alias_w)]);
-            } else if (alias_w->is_physical_reg()) {
-                ok_colors.erase(alias_w);
-            }
         }
         if (ok_colors.empty()) {
             spilled_nodes.insert(reg);
@@ -393,19 +404,22 @@ void RegisterAllocation::assign_colors() {
 
 void RegisterAllocation::rewrite_program() {
     initial.clear();
+    Register::temp_regs.clear();
     for (auto &reg : spilled_nodes) {
         func->frame_scheduler->insert_reg(reg);
     }
     for (auto &block : func->get_basic_blocks()) {
-        auto instrs = block->get_instrs();
-        block->clear_instrs();
+        // auto instrs = block->get_instrs();
+        // block->clear_instrs();
 
-        for (auto &instr : instrs) {
+        for (auto it = block->get_instrs().begin();
+             it != block->get_instrs().end(); it++) {
+            auto instr = *it;
             for (auto &reg : instr->get_use()) {
                 if (spilled_nodes.find(reg) == spilled_nodes.end())
                     continue;
+                builder->set_insert_point(block, it);
                 auto vreg = VirtualRegister::create(reg->get_type());
-                initial.insert(vreg);
 
                 instr->replace_use(reg, vreg);
 
@@ -416,43 +430,37 @@ void RegisterAllocation::rewrite_program() {
 
                 switch (reg->get_type()) {
                 case Register::RegisterType::General:
-                    if (std::make_shared<Immediate>(offset)->is_imm_length(
-                            12)) {
-                        builder.append_instr(
-                            block, MachineInstr::Tag::LD,
+                    if (Immediate::create(offset)->is_imm_length(12)) {
+                        builder->insert_instr(
+                            MachineInstr::Tag::LD,
                             {vreg, stack_reg,
-                             std::make_shared<Immediate>(
+                             Immediate::create(
                                  func->frame_scheduler->get_reg_offset(reg))},
                             MachineInstr::Suffix::DWORD);
                     } else {
                         auto offset_reg = VirtualRegister::create(
                             Register::RegisterType::General);
-                        initial.insert(offset_reg);
-                        builder.add_int_to_reg(block, offset_reg, stack_reg,
-                                               offset);
-                        builder.append_instr(
-                            block, MachineInstr::Tag::LD,
-                            {vreg, offset_reg, std::make_shared<Immediate>(0)},
+                        builder->add_int_to_reg(offset_reg, stack_reg, offset);
+                        builder->insert_instr(
+                            MachineInstr::Tag::LD,
+                            {vreg, offset_reg, Immediate::create(0)},
                             MachineInstr::Suffix::DWORD);
                     }
                     break;
                 case Register::RegisterType::Float:
-                    if (std::make_shared<Immediate>(offset)->is_imm_length(
-                            12)) {
-                        builder.append_instr(
-                            block, MachineInstr::Tag::FLD_S,
+                    if (Immediate::create(offset)->is_imm_length(12)) {
+                        builder->insert_instr(
+                            MachineInstr::Tag::FLD_S,
                             {vreg, stack_reg,
-                             std::make_shared<Immediate>(
+                             Immediate::create(
                                  func->frame_scheduler->get_reg_offset(reg))});
                     } else {
                         auto offset_reg = VirtualRegister::create(
                             Register::RegisterType::General);
-                        initial.insert(offset_reg);
-                        builder.add_int_to_reg(block, offset_reg, stack_reg,
-                                               offset);
-                        builder.append_instr(
-                            block, MachineInstr::Tag::FLD_S,
-                            {vreg, offset_reg, std::make_shared<Immediate>(0)});
+                        builder->add_int_to_reg(offset_reg, stack_reg, offset);
+                        builder->insert_instr(
+                            MachineInstr::Tag::FLD_S,
+                            {vreg, offset_reg, Immediate::create(0)});
                     }
                     break;
                 case Register::RegisterType::FloatCmp:
@@ -461,12 +469,12 @@ void RegisterAllocation::rewrite_program() {
                     break;
                 }
             }
-            block->append_instr(instr);
+
             for (auto &reg : instr->get_def()) {
                 if (spilled_nodes.find(reg) == spilled_nodes.end())
                     continue;
+                builder->set_insert_point(block, std::next(it));
                 auto vreg = VirtualRegister::create(reg->get_type());
-                initial.insert(vreg);
 
                 instr->replace_def(reg, vreg);
 
@@ -476,43 +484,37 @@ void RegisterAllocation::rewrite_program() {
                                      : PhysicalRegister::fp();
                 switch (reg->get_type()) {
                 case Register::RegisterType::General:
-                    if (std::make_shared<Immediate>(offset)->is_imm_length(
-                            12)) {
-                        builder.append_instr(
-                            block, MachineInstr::Tag::ST,
+                    if (Immediate::create(offset)->is_imm_length(12)) {
+                        builder->insert_instr(
+                            MachineInstr::Tag::ST,
                             {vreg, stack_reg,
-                             std::make_shared<Immediate>(
+                             Immediate::create(
                                  func->frame_scheduler->get_reg_offset(reg))},
                             MachineInstr::Suffix::DWORD);
                     } else {
                         auto offset_reg = VirtualRegister::create(
                             Register::RegisterType::General);
-                        initial.insert(offset_reg);
-                        builder.add_int_to_reg(block, offset_reg, stack_reg,
-                                               offset);
-                        builder.append_instr(
-                            block, MachineInstr::Tag::ST,
-                            {vreg, offset_reg, std::make_shared<Immediate>(0)},
+                        builder->add_int_to_reg(offset_reg, stack_reg, offset);
+                        builder->insert_instr(
+                            MachineInstr::Tag::ST,
+                            {vreg, offset_reg, Immediate::create(0)},
                             MachineInstr::Suffix::DWORD);
                     }
                     break;
                 case Register::RegisterType::Float:
-                    if (std::make_shared<Immediate>(offset)->is_imm_length(
-                            12)) {
-                        builder.append_instr(
-                            block, MachineInstr::Tag::FST_S,
+                    if (Immediate::create(offset)->is_imm_length(12)) {
+                        builder->insert_instr(
+                            MachineInstr::Tag::FST_S,
                             {vreg, stack_reg,
-                             std::make_shared<Immediate>(
+                             Immediate::create(
                                  func->frame_scheduler->get_reg_offset(reg))});
                     } else {
                         auto offset_reg = VirtualRegister::create(
                             Register::RegisterType::General);
-                        initial.insert(offset_reg);
-                        builder.add_int_to_reg(block, offset_reg, stack_reg,
-                                               offset);
-                        builder.append_instr(
-                            block, MachineInstr::Tag::FST_S,
-                            {vreg, offset_reg, std::make_shared<Immediate>(0)});
+                        builder->add_int_to_reg(offset_reg, stack_reg, offset);
+                        builder->insert_instr(
+                            MachineInstr::Tag::FST_S,
+                            {vreg, offset_reg, Immediate::create(0)});
                     }
                     break;
                 case Register::RegisterType::FloatCmp:
@@ -523,9 +525,32 @@ void RegisterAllocation::rewrite_program() {
             }
         }
     }
+    rewrite_prologue();
+
     initial.insert(coalesced_nodes.begin(), coalesced_nodes.end());
     initial.insert(colored_nodes.begin(), colored_nodes.end());
+    initial.insert(Register::temp_regs.begin(), Register::temp_regs.end());
     spilled_nodes.clear();
     coalesced_nodes.clear();
     colored_nodes.clear();
+}
+
+void RegisterAllocation::rewrite_prologue() {
+    auto prologue = func->get_prologue_block();
+    auto it =
+        prologue->find_instr([](auto &instr) { return instr->is_frame_set(); });
+    while (it != prologue->get_instrs_end() && (*it)->is_frame_set()) {
+        it = prologue->erase_instr(it);
+    }
+
+    builder->set_flag(MachineInstr::Flag::IS_FRAME_SET);
+    builder->set_insert_point(prologue, it);
+
+    builder->add_int_to_reg(PhysicalRegister::sp(), PhysicalRegister::sp(),
+                            -func->frame_scheduler->get_frame_size());
+    // add a nop instruction to mark the pos of frame set
+    // which will be removed later
+    builder->insert_instr(MachineInstr::Tag::MOV,
+                          {PhysicalRegister::zero(), PhysicalRegister::zero()});
+    builder->set_flag(0);
 }

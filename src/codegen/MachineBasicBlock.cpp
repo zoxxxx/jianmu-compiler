@@ -1,8 +1,10 @@
 
 #include "MachineBasicBlock.hpp"
 #include "MachineFunction.hpp"
+#include "MachineInstr.hpp"
 #include "Operand.hpp"
 #include <cassert>
+#include <list>
 #include <memory>
 MachineBasicBlock::MachineBasicBlock(BasicBlock *IR_bb,
                                      std::weak_ptr<MachineFunction> parent,
@@ -32,12 +34,26 @@ std::weak_ptr<MachineFunction> MachineBasicBlock::get_parent() const {
 
 void MachineBasicBlock::insert_instr(
     std::shared_ptr<MachineInstr> instr,
-    std::vector<std::shared_ptr<MachineInstr>>::iterator it) {
+    std::list<std::shared_ptr<MachineInstr>>::iterator it) {
     instrs.insert(it, instr);
 }
-void MachineBasicBlock::append_instr(std::shared_ptr<MachineInstr> instr) {
-    instrs.push_back(instr);
+
+std::list<std::shared_ptr<MachineInstr>>::iterator
+MachineBasicBlock::erase_instr(
+    std::list<std::shared_ptr<MachineInstr>>::iterator it) {
+    return instrs.erase(it);
 }
+
+std::list<std::shared_ptr<MachineInstr>>::iterator
+MachineBasicBlock::get_instrs_begin() {
+    return instrs.begin();
+}
+
+std::list<std::shared_ptr<MachineInstr>>::iterator
+MachineBasicBlock::get_instrs_end() {
+    return instrs.end();
+}
+
 void MachineBasicBlock::clear_instrs() { instrs.clear(); }
 void MachineBasicBlock::add_succ_basic_block(
     std::weak_ptr<MachineBasicBlock> succ) {
@@ -49,7 +65,7 @@ void MachineBasicBlock::add_pre_basic_block(
     assert(pred.lock() != nullptr && "pred is nullptr");
     preds.push_back(pred);
 }
-std::vector<std::shared_ptr<MachineInstr>> &MachineBasicBlock::get_instrs() {
+std::list<std::shared_ptr<MachineInstr>> &MachineBasicBlock::get_instrs() {
     return instrs;
 }
 BasicBlock *MachineBasicBlock::get_IR_basic_block() const {
@@ -61,7 +77,7 @@ std::string MachineBasicBlock::print() const {
     std::string ret;
     ret += get_name() + ":\n";
     for (auto &instr : instrs) {
-        if(instr->print() != "")
+        if (instr->print() != "")
             ret += "\t" + instr->print();
     }
     return ret;
