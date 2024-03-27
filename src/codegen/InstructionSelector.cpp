@@ -378,7 +378,7 @@ void InstructionSelector::gen_alloca() {
 
     builder->add_int_to_reg(
         dst_reg, PhysicalRegister::fp(),
-        -context.machine_func->frame_scheduler->get_alloca_offset(allocaInst));
+        context.machine_func->frame_scheduler->get_alloca_offset(allocaInst));
 }
 
 void InstructionSelector::gen_load() {

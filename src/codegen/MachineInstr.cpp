@@ -97,9 +97,9 @@ std::string get_tag_name(MachineInstr::Tag tag) {
     case MachineInstr::Tag::FTINTRZ_W_S:
         return "ftintrz.w.s";
     case MachineInstr::Tag::MOVGR2FR_W:
-        return "movgr2fr.s";
+        return "movgr2fr.w";
     case MachineInstr::Tag::MOVFR2GR_S:
-        return "movfr2gr.w";
+        return "movfr2gr.s";
     case MachineInstr::Tag::MOVGR2CF:
         return "movgr2cf";
     case MachineInstr::Tag::MOVCF2GR:
