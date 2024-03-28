@@ -6,6 +6,7 @@
 #include <stack>
 #include <unordered_map>
 #include <unordered_set>
+#include <map>
 #include <vector>
 
 class MachineInstr;
@@ -61,6 +62,7 @@ class RegisterAllocation : public MachinePass {
     RegisterSet coalesced_nodes;
     RegisterSet colored_nodes;
     std::vector<std::shared_ptr<Register>> select_stack;
+    RegisterSet in_select_stack;
 
     MoveSet coalesced_moves;
     MoveSet constrained_moves;

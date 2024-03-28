@@ -71,7 +71,6 @@ class FrameScheduler {
         auto alloca_inst = static_cast<AllocaInst *>(val);
         frame_size =
             align(frame_size + alloca_inst->get_alloca_type()->get_size(), 16);
-        std::cerr<<"frame_size: "<<frame_size<<"\n";
         alloca_map[val] = frame_size;
     }
     void insert_reg(std::shared_ptr<Register> reg) {
