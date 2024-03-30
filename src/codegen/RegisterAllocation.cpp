@@ -57,40 +57,25 @@ void RegisterAllocation::run_on_func(std::shared_ptr<MachineFunction> func) {
         alias[reg] = reg;
     }
     do {
-        std::cerr << initial.size() << std::endl;
         liveness_analysis->run_on_func(func);
         build_graph();
-        std::cerr << "done build graph\n";
         make_worklist();
-        std::cerr << "done make worklist\n";
         do {
             if (simplify_worklist.size()) {
-                // std::cerr<<"simplify\n";
                 simplify();
-                // std::cerr<<"done simplify\n";
             } else if (worklist_moves.size()) {
-                std::cerr << "coalesce\n";
                 coalesce();
-                std::cerr << "done coalesce\n";
             } else if (freeze_worklist.size()) {
-                std::cerr << "freeze\n";
                 freeze();
-                std::cerr << "done freeze\n";
             } else if (spill_worklist.size()) {
-                std::cerr << "select spill\n";
                 select_spill();
-                std::cerr << "done select spill\n";
             }
         } while (simplify_worklist.size() || worklist_moves.size() ||
                  freeze_worklist.size() || spill_worklist.size());
 
-        std::cerr << "done simplify, coalesce, freeze, select spill\n";
         assign_colors();
-        std::cerr << "done assign colors\n";
         if (spilled_nodes.size()) {
-            std::cerr << "rewrite program\n";
             rewrite_program();
-            std::cerr << "done rewrite program\n";
             is_spill = true;
         } else
             is_spill = false;
