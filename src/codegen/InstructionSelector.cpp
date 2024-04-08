@@ -8,11 +8,15 @@
 #include "MachineInstr.hpp"
 #include "Module.hpp"
 #include "Operand.hpp"
+#include "PatternMatch.hpp"
+#include "Value.hpp"
 
+#include <cstddef>
 #include <iostream>
 #include <memory>
 #include <utility>
 
+using namespace PatternMatch;
 std::shared_ptr<Register> InstructionSelector::get_reg(Value *val) {
     if (dynamic_cast<Constant *>(val) != nullptr) {
         if (dynamic_cast<ConstantInt *>(val) != nullptr) {
@@ -94,7 +98,8 @@ void InstructionSelector::run() {
         for (auto &bb : machine_func->get_basic_blocks()) {
             context.machine_bb = bb;
             builder->set_insert_point(bb, bb->find_instr([](auto &instr) {
-                return not instr->is_phi_mov() and not instr->is_func_args_set();
+                return not instr->is_phi_mov() and
+                       not instr->is_func_args_set();
             }));
             for (auto &inst : bb->get_IR_basic_block()->get_instructions()) {
                 context.IR_inst = &inst;
@@ -287,16 +292,80 @@ void InstructionSelector::gen_br() {
     builder->set_insert_point(context.machine_bb,
                               context.machine_bb->get_instrs_end());
     if (branchInst->is_cond_br()) {
+        BasicBlock *truebb =
+            static_cast<BasicBlock *>(branchInst->get_operand(1));
+        BasicBlock *falsebb =
+            static_cast<BasicBlock *>(branchInst->get_operand(2));
         auto *cond = branchInst->get_operand(0);
-        auto *truebb = static_cast<BasicBlock *>(branchInst->get_operand(1));
-        auto *falsebb = static_cast<BasicBlock *>(branchInst->get_operand(2));
-
-        auto tmp_reg = VirtualRegister::create(Register::General);
-        builder->insert_instr(
-            MachineInstr::Tag::BNEZ,
-            {get_reg(cond), std::make_shared<Label>(bb_map[truebb])});
-        builder->insert_instr(MachineInstr::Tag::B,
-                              {std::make_shared<Label>(bb_map[falsebb])});
+        Instruction::OpID op;
+        Value *X, *Y;
+        if (match(cond, m_icmp(m_op(op), m_value(X), m_value(Y)))) {
+            switch (op) {
+            case Instruction::eq:
+                builder->insert_instr(
+                    MachineInstr::Tag::BEQ,
+                    {get_reg(X), get_reg(Y),
+                     std::make_shared<Label>(bb_map[truebb])});
+                builder->insert_instr(
+                    MachineInstr::Tag::B,
+                    {std::make_shared<Label>(bb_map[falsebb])});
+                break;
+            case Instruction::ne:
+                builder->insert_instr(
+                    MachineInstr::Tag::BNE,
+                    {get_reg(X), get_reg(Y),
+                     std::make_shared<Label>(bb_map[truebb])});
+                builder->insert_instr(
+                    MachineInstr::Tag::B,
+                    {std::make_shared<Label>(bb_map[falsebb])});
+                break;
+            case Instruction::gt:
+                builder->insert_instr(
+                    MachineInstr::Tag::BLT,
+                    {get_reg(Y), get_reg(X),
+                     std::make_shared<Label>(bb_map[truebb])});
+                builder->insert_instr(
+                    MachineInstr::Tag::B,
+                    {std::make_shared<Label>(bb_map[falsebb])});
+                break;
+            case Instruction::ge:
+                builder->insert_instr(
+                    MachineInstr::Tag::BGE,
+                    {get_reg(X), get_reg(Y),
+                     std::make_shared<Label>(bb_map[truebb])});
+                builder->insert_instr(
+                    MachineInstr::Tag::B,
+                    {std::make_shared<Label>(bb_map[falsebb])});
+                break;
+            case Instruction::lt:
+                builder->insert_instr(
+                    MachineInstr::Tag::BLT,
+                    {get_reg(X), get_reg(Y),
+                     std::make_shared<Label>(bb_map[truebb])});
+                builder->insert_instr(
+                    MachineInstr::Tag::B,
+                    {std::make_shared<Label>(bb_map[falsebb])});
+                break;
+            case Instruction::le:
+                builder->insert_instr(
+                    MachineInstr::Tag::BGE,
+                    {get_reg(Y), get_reg(X),
+                     std::make_shared<Label>(bb_map[truebb])});
+                builder->insert_instr(
+                    MachineInstr::Tag::B,
+                    {std::make_shared<Label>(bb_map[falsebb])});
+                break;
+            default:
+                assert(false);
+            }
+        } else {
+            auto tmp_reg = VirtualRegister::create(Register::General);
+            builder->insert_instr(
+                MachineInstr::Tag::BNEZ,
+                {get_reg(cond), std::make_shared<Label>(bb_map[truebb])});
+            builder->insert_instr(MachineInstr::Tag::B,
+                                  {std::make_shared<Label>(bb_map[falsebb])});
+        }
     } else {
         auto *branchbb = static_cast<BasicBlock *>(branchInst->get_operand(0));
         builder->insert_instr(MachineInstr::Tag::B,
@@ -440,6 +509,14 @@ void InstructionSelector::gen_store() {
 
 void InstructionSelector::gen_icmp() {
     auto *icmpInst = static_cast<ICmpInst *>(context.IR_inst);
+    if (icmpInst->get_use_list().size() == 1) {
+        Use u = *(icmpInst->get_use_list().begin());
+        auto inst = dynamic_cast<Instruction *>(u.val_);
+        if (inst != nullptr && inst->get_instr_type() == Instruction::br) {
+            return;
+        }
+    }
+
     auto op1 = get_reg(icmpInst->get_operand(0));
     auto op2 = get_reg(icmpInst->get_operand(1));
 

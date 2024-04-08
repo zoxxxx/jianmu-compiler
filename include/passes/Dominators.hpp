@@ -32,7 +32,6 @@ class Dominators : public Pass {
     void create_dom_tree_succ(Function *f);
     void dfs(BasicBlock *bb, std::set<BasicBlock *> &visited);
     BasicBlock *intersect(BasicBlock *bb1, BasicBlock *bb2);
-    // TODO 补充需要的函数
 
     std::vector<BasicBlock *> post_order_vec_{}; // 逆后序
     std::map<BasicBlock *, unsigned int> post_order_{}; // 逆后序

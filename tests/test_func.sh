@@ -99,7 +99,8 @@ for case in $testcases; do
 	# if debug or ll mode on, generate .ll also
 	if [ $debug_mode = true ] || [ $ll_mode = true ]; then
 		timeout $timeout bash -c "cminusfc -emit-llvm -mem2reg $case -o $ll_file" >>$LOG 2>&1
-		# timeout $timeout bash -c "clang -S -emit-llvm -O3 -D 'starttime()=_sysy_starttime(__LINE__)' -D 'stoptime()=_sysy_stoptime(__LINE__)' $c_file -o $ll_file" >>$LOG 2>&1
+		# timeout $timeout bash -c "clang -S -emit-llvm -O0 -D 'starttime()=_sysy_starttime(__LINE__)' -D 'stoptime()=_sysy_stoptime(__LINE__)' $c_file -o $ll_file" >>$LOG 2>&1
+		# timeout $timeout bash -c "clang -S -emit-llvm $c_file -o $ll_file" >>$LOG 2>&1
 		check_compile_time $? "TLE" "cminusfc compiler error" || continue
 	fi
 
@@ -126,7 +127,8 @@ for case in $testcases; do
 		fi
 	else
 		# For ll mode, use llc and clang to compile and run .ll file
-		timeout $timeout llc "$ll_file" -filetype=obj -o "$output_dir/$case_base_name.o" >>$LOG 2>&1
+		opt --instcombine "$ll_file" -o "$ll_file" >>$LOG 2>&1
+		timeout $timeout llc "$ll_file" -O0 -filetype=obj -o "$output_dir/$case_base_name.o" >>$LOG 2>&1
 		check_compile_time $? "TLE" "llc compiler error" || continue
 		check_return_value $? 0 "CE" "llc compiler error" || continue
 

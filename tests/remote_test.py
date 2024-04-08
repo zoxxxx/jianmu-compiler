@@ -11,12 +11,12 @@ timeout = 3600
 
 def usage():
     print(f"Usage: {sys.argv[1]} [testcase-set-name] [compiler]")
-    print("testcase-set-name: 'functional', 'hidden-functional', 'performance' or 'final-performance', the name of the testcase set")
-    print("compiler: 'cminusfc' or 'clang', the compiler to use")
+    print("testcase-set-name: 'functional', 'hidden_functional', 'performance' or 'final_performance', the name of the testcase set")
+    print("compiler: 'cminusfc', 'clang' or 'g++', the compiler to use")
     sys.exit(0)
 
 # 检查参数
-if len(sys.argv) < 3 or sys.argv[1] not in ["functional", "hidden-functional", "performance", "final_performance"] \
+if len(sys.argv) < 3 or sys.argv[1] not in ["functional", "hidden_functional", "performance", "final_performance"] \
     or sys.argv[2] not in ["cminusfc", "clang", "g++"]:
     usage()
 
@@ -74,10 +74,18 @@ with open(log_file, "w") as log:
             result = subprocess.run(f"sed -i '1i #include \"/home/zox/compiler/2023ustc-jianmu-compiler/src/sylib/sylib.c\"' {c_file}", shell=True, text=True, capture_output=True)
             result = subprocess.run(f"sed -i '1i #include \"/home/zox/compiler/2023ustc-jianmu-compiler/src/sylib/sylib.h\"' {c_file}", shell=True, text=True, capture_output=True)
 
-            result = subprocess.run(f"timeout {timeout} loongarch64-unknown-linux-gnu-g++ -static -S {c_file} -o {asm_file} -O3 >&2", shell=True, text=True, capture_output=True)
+            result = subprocess.run(f"timeout {timeout} loongarch64-unknown-linux-gnu-g++ -O3 -static -S {c_file} -o {asm_file} >&2", shell=True, text=True, capture_output=True)
             print(result.stderr)
         elif compiler == "cminusfc":
             result = subprocess.run(f"timeout {timeout} cminusfc -S -mem2reg {case_path} -o {asm_file} >&2", shell=True, text=True, capture_output=True)
+        elif compiler == "clang":
+            c_file = output_dir / f"{case_base_name}.c"
+            result = subprocess.run(f"cp {case_path} {c_file}", shell=True, text=True, capture_output=True)
+            result = subprocess.run(f"sed -i '1i #include \"/home/zox/compiler/2023ustc-jianmu-compiler/src/sylib/sylib.c\"' {c_file}", shell=True, text=True, capture_output=True)
+            result = subprocess.run(f"sed -i '1i #include \"/home/zox/compiler/2023ustc-jianmu-compiler/src/sylib/sylib.h\"' {c_file}", shell=True, text=True, capture_output=True)
+
+            result = subprocess.run(f"timeout {timeout} clang -static -S --target=loongarch64 {c_file} -o {asm_file} -O0 >&2", shell=True, text=True, capture_output=True)
+            print(result.stderr)
         if result.returncode != 0:
             # 检查是否因为超时
             if result.returncode == 124:

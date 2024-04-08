@@ -9,11 +9,29 @@ void DeadCode::run() {
         changed = false;
         for (auto &F : m_->get_functions()) {
             auto func = &F;
+            changed |= clear_basic_blocks(func);
             mark(func);
             changed |= sweep(func);
         }
     } while (changed);
     LOG_INFO << "dead code pass erased " << ins_count << " instructions";
+}
+
+bool DeadCode::clear_basic_blocks(Function *func) {
+    bool changed = 0;
+    std::vector<BasicBlock *> to_erase;
+    for (auto &bb1 : func->get_basic_blocks()) {
+        auto bb = &bb1;
+        if(bb->get_pre_basic_blocks().empty() && bb != func->get_entry_block()) {
+            to_erase.push_back(bb);
+            changed = 1;
+        }
+    }
+    for (auto &bb : to_erase) {
+        bb->erase_from_parent();
+        delete bb;
+    }
+    return changed;
 }
 
 void DeadCode::mark(Function *func) {
