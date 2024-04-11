@@ -22,6 +22,16 @@ std::string get_tag_name(MachineInstr::Tag tag) {
         return "div";
     case MachineInstr::Tag::MOD:
         return "mod";
+    case MachineInstr::Tag::SLL:
+        return "sll";
+    case MachineInstr::Tag::SRL:
+        return "srl";
+    case MachineInstr::Tag::SLLI:
+        return "slli";
+    case MachineInstr::Tag::SRLI:
+        return "srli";
+    case MachineInstr::Tag::SRAI:
+        return "srai";
     case MachineInstr::Tag::LU12I_W:
         return "lu12i.w";
     case MachineInstr::Tag::LU32I_D:

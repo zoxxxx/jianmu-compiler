@@ -48,20 +48,25 @@ void InitValCalc::store_value(Module *module, IRBuilder *builder,
         builder->create_store(single_val, alloca_inst);
         return;
     }
-    bool all_zero = true;
+#ifndef ZERO_ASSIGN_RATIO
+#define ZERO_ASSIGN_RATIO 0.5
+#endif
+    int zero_count = 0;
     for (int i = 0; i < (int)suffix_product[0]; i++) {
         if (dynamic_cast<Constant *>(vals[i]) == nullptr)
-            all_zero = false;
+            continue;
         if (dynamic_cast<ConstantInt *>(vals[i]) != nullptr &&
             dynamic_cast<ConstantInt *>(vals[i])->get_value() != 0)
-            all_zero = false;
+            continue;
         if (dynamic_cast<ConstantFP *>(vals[i]) != nullptr &&
             dynamic_cast<ConstantFP *>(vals[i])->get_value() != 0.)
-            all_zero = false;
-        if (not all_zero)
+            continue;
+        zero_count++;
+        if (zero_count > (int)suffix_product[0] * ZERO_ASSIGN_RATIO)
             break;
     }
-    if (all_zero) {
+    bool assign_zero = false;
+    if (zero_count > (int)suffix_product[0] * ZERO_ASSIGN_RATIO) {
         auto cast =
             builder->create_bitcast(alloca_inst, module->get_int8_ptr_type());
         builder->create_call(
@@ -70,9 +75,18 @@ void InitValCalc::store_value(Module *module, IRBuilder *builder,
              ConstantInt::get(
                  (long long)alloca_inst->get_alloca_type()->get_size(),
                  module)});
-        return;
+        assign_zero = true;
     }
+#undef ZERO_ASSIGN_RATIO
     for (int i = 0; i < (int)suffix_product[0]; i++) {
+        if (assign_zero) {
+            if (dynamic_cast<ConstantInt *>(vals[i]) != nullptr &&
+                dynamic_cast<ConstantInt *>(vals[i])->get_value() == 0)
+                continue;
+            if (dynamic_cast<ConstantFP *>(vals[i]) != nullptr &&
+                dynamic_cast<ConstantFP *>(vals[i])->get_value() == 0.)
+                continue;
+        }
         if (vals[i]->get_type()->is_float_type() && type->is_integer_type())
             assert(false &&
                    "trying to initialize integer array with float value");

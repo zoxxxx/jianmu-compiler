@@ -264,6 +264,7 @@ class Immediate : public Operand {
     std::string get_name() const override final {
         return std::to_string(value);
     }
+    int get_value() const { return value; }
     Immediate(int value) : value(value) {}
   private:
     int value;

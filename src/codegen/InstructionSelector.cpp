@@ -731,13 +731,27 @@ void InstructionSelector::gen_gep() {
             type = type->get_array_element_type();
         } else
             size = type->get_size();
+        if (dynamic_cast<ConstantInt *>(idx) != nullptr) {
+            auto offset = static_cast<ConstantInt *>(idx)->get_value() * size;
+            auto tmp_reg = VirtualRegister::create(Register::General);
+            builder->add_int_to_reg(tmp_reg, pre, offset);
+            pre = tmp_reg;
+            continue;
+        }
         auto tmp_reg1 = VirtualRegister::create(Register::General);
         auto tmp_reg2 = VirtualRegister::create(Register::General);
         auto tmp_reg3 = VirtualRegister::create(Register::General);
-        builder->load_int32(size, tmp_reg1);
-        builder->insert_instr(MachineInstr::Tag::MUL,
-                              {tmp_reg2, get_reg(idx), tmp_reg1},
-                              MachineInstr::Suffix::WORD);
+        if ((size & (size - 1)) == 0) {
+            auto bit = __builtin_ffs(size) - 1;
+            builder->insert_instr(MachineInstr::Tag::SLLI,
+                                  {tmp_reg2, get_reg(idx), Immediate::create(bit)},
+                                  MachineInstr::Suffix::WORD);
+        } else {
+            builder->load_int32(size, tmp_reg1);
+            builder->insert_instr(MachineInstr::Tag::MUL,
+                                  {tmp_reg2, get_reg(idx), tmp_reg1},
+                                  MachineInstr::Suffix::WORD);
+        }
         builder->insert_instr(MachineInstr::Tag::ADD, {tmp_reg3, pre, tmp_reg2},
                               MachineInstr::Suffix::DWORD);
         pre = tmp_reg3;

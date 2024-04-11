@@ -23,6 +23,12 @@ class MachineInstr : public std::enable_shared_from_this<MachineInstr> {
         MUL,
         DIV,
         MOD,
+        // shift operation
+        SLL,
+        SRL,
+        SLLI,
+        SRLI,
+        SRAI,
         // logical operation
         LU12I_W,
         LU32I_D,

@@ -81,6 +81,10 @@ void MIBuilder::add_int_to_reg(std::shared_ptr<Register> dst,
     if (src == dst && val == 0) {
         return;
     }
+    if(val == 0){
+        insert_instr(MachineInstr::Tag::MOV, {dst, src});
+        return;
+    }
     auto imm = Immediate::create(val);
     if (imm->is_imm_length(12))
         insert_instr(MachineInstr::Tag::ADDI, {dst, src, imm},
@@ -172,6 +176,16 @@ InstructionChecker::InstructionChecker() {
         3, {GENERAL, GENERAL, GENERAL}, 0, true, {WORD, DWORD});
     requirements[MachineInstr::Tag::MOD] = InstructionRequirement(
         3, {GENERAL, GENERAL, GENERAL}, 0, true, {WORD, DWORD});
+    requirements[MachineInstr::Tag::SLL] = InstructionRequirement(
+        3, {GENERAL, GENERAL, GENERAL}, 0, true, {WORD, DWORD});
+    requirements[MachineInstr::Tag::SRL] = InstructionRequirement(
+        3, {GENERAL, GENERAL, GENERAL}, 0, true, {WORD, DWORD});
+    requirements[MachineInstr::Tag::SLLI] = InstructionRequirement(
+        3, {GENERAL, GENERAL, IMM}, 12, false, {WORD, DWORD});
+    requirements[MachineInstr::Tag::SRLI] = InstructionRequirement(
+        3, {GENERAL, GENERAL, IMM}, 12, false, {WORD, DWORD});
+    requirements[MachineInstr::Tag::SRAI] = InstructionRequirement(
+        3, {GENERAL, GENERAL, IMM}, 12, false, {WORD, DWORD});
     requirements[MachineInstr::Tag::LU12I_W] =
         InstructionRequirement(2, {GENERAL, IMM}, 20, true);
     requirements[MachineInstr::Tag::LU32I_D] =

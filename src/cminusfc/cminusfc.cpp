@@ -11,6 +11,7 @@
 #include "PassManager.hpp"
 #include "RegisterAllocation.hpp"
 #include "cminusf_builder.hpp"
+#include "PeepholeOptimization.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -79,6 +80,7 @@ int main(int argc, char **argv) {
         auto MM = std::make_shared<MachineModule>(m.get());
         auto MPM = std::make_shared<MachinePassManager>(MM);
         MPM->add_pass<InstructionSelector>();
+        MPM->add_pass<PeepholeOptimization>();
         MPM->add_pass<RegisterAllocation>();
         MPM->run();
         output_stream << MM->print();
