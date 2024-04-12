@@ -2,6 +2,7 @@
 
 #include "Type.hpp"
 #include "User.hpp"
+#include "Value.hpp"
 
 #include <cstdint>
 #include <llvm/ADT/ilist_node.h>
@@ -360,6 +361,17 @@ class PhiInst : public BaseInst<PhiInst> {
         this->add_operand(val);
         this->add_operand(pre_bb);
     }
+
+    void remove_phi_operand(Value *pre_bb) {
+        for (unsigned i = 0; i < this->get_num_operand(); i += 2) {
+            if (this->get_operand(i + 1) == pre_bb) {
+                this->remove_operand(i);
+                this->remove_operand(i);
+                return;
+            }
+        }
+    }
+
     virtual std::string print() override;
 };
 

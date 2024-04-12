@@ -3,15 +3,16 @@
 #include "Instruction.hpp"
 #include "InstructionSelector.hpp"
 #include "LivenessAnalysis.hpp"
+#include "LoopDetection.hpp"
 #include "MachineModule.hpp"
 #include "MachinePass.hpp"
 #include "Mem2Reg.hpp"
 #include "Module.hpp"
 #include "Operand.hpp"
 #include "PassManager.hpp"
+#include "PeepholeOptimization.hpp"
 #include "RegisterAllocation.hpp"
 #include "cminusf_builder.hpp"
-#include "PeepholeOptimization.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -63,6 +64,8 @@ int main(int argc, char **argv) {
     if (config.mem2reg) {
         PM.add_pass<DeadCode>();
         PM.add_pass<Mem2Reg>();
+        m->print();
+        PM.add_pass<LoopDetection>();
         PM.add_pass<DeadCode>();
     }
     PM.run();
@@ -73,6 +76,7 @@ int main(int argc, char **argv) {
         output_stream << "; ModuleID = 'cminus'\n";
         output_stream << "source_filename = " << abs_path << "\n\n";
         output_stream << m->print();
+        PM.print();
     } else if (config.emitasm) {
         // CodeGen codegen(m.get());
         // codegen.run();

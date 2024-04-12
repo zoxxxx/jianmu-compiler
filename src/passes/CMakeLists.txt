@@ -4,4 +4,6 @@ add_library(
     Mem2Reg.cpp
     FuncInfo.cpp
     DeadCode.cpp
+    LoopDetection.cpp
+    LICM.cpp
 )

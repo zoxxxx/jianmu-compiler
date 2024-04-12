@@ -10,6 +10,7 @@ class Pass {
     Pass(Module *m) : m_(m) {}
     virtual ~Pass() = default;
     virtual void run() = 0;
+    virtual void print() {}
 
   protected:
     Module *m_;
@@ -27,6 +28,15 @@ class PassManager {
     void run() {
         for (auto &pass : passes_) {
             pass->run();
+        }
+    }
+    void print() {
+
+        for (auto &pass : passes_) {
+            std::cerr << "Pass: ";
+            auto &pass_ref = *pass;
+            std::cerr << typeid(pass_ref).name() << std::endl;
+            pass->print();
         }
     }
 

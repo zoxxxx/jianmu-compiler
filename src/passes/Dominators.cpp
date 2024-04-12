@@ -1,22 +1,27 @@
-#include "Dominators.hpp"
 #include "BasicBlock.hpp"
+#include "Dominators.hpp"
+
+void Dominators::run_on_func(Function *f) {
+    if (f->get_basic_blocks().size() == 0)
+        return;
+    for (auto &bb1 : f->get_basic_blocks()) {
+        auto bb = &bb1;
+        idom_.insert({bb, {}});
+        dom_frontier_.insert({bb, {}});
+        dom_tree_succ_blocks_.insert({bb, {}});
+    }
+
+    create_reverse_post_order(f);
+    create_idom(f);
+    create_dominance_frontier(f);
+    create_dom_tree_succ(f);
+    create_dom_dfs_order(f);
+}
 
 void Dominators::run() {
     for (auto &f1 : m_->get_functions()) {
         auto f = &f1;
-        if (f->get_basic_blocks().size() == 0)
-            continue;
-        for (auto &bb1 : f->get_basic_blocks()) {
-            auto bb = &bb1;
-            idom_.insert({bb, {}});
-            dom_frontier_.insert({bb, {}});
-            dom_tree_succ_blocks_.insert({bb, {}});
-        }
-        
-        create_reverse_post_order(f);
-        create_idom(f);
-        create_dominance_frontier(f);
-        create_dom_tree_succ(f);
+        run_on_func(f);
     }
 }
 
@@ -55,38 +60,38 @@ void Dominators::create_idom(Function *f) {
     bool changed;
     do {
         changed = false;
-        for(auto it = post_order_vec_.rbegin(); it != post_order_vec_.rend(); it++){
+        for (auto it = post_order_vec_.rbegin(); it != post_order_vec_.rend();
+             it++) {
             auto bb = *it;
             if (bb == f->get_entry_block())
                 continue;
-            if(bb->get_pre_basic_blocks().empty())
+            if (bb->get_pre_basic_blocks().empty())
                 continue;
             BasicBlock *first_pred = bb->get_pre_basic_blocks().front();
             BasicBlock *new_idom = first_pred;
             for (auto &pred : bb->get_pre_basic_blocks()) {
-                if(pred == first_pred)
+                if (pred == first_pred)
                     continue;
-                if(get_idom(pred) != nullptr){
+                if (get_idom(pred) != nullptr) {
                     new_idom = intersect(pred, new_idom);
                 }
             }
-            if(new_idom != get_idom(bb)){
+            if (new_idom != get_idom(bb)) {
                 changed = true;
                 idom_[bb] = new_idom;
             }
         }
-    }
-    while(changed);
+    } while (changed);
 }
 
 void Dominators::create_dominance_frontier(Function *f) {
     // 分析得到 f 中各个基本块的支配边界集合
-    for (auto &bb1 : f->get_basic_blocks()){
+    for (auto &bb1 : f->get_basic_blocks()) {
         auto bb = &bb1;
-        if (bb->get_pre_basic_blocks().size() >= 2){
-            for (auto &pred : bb->get_pre_basic_blocks()){
+        if (bb->get_pre_basic_blocks().size() >= 2) {
+            for (auto &pred : bb->get_pre_basic_blocks()) {
                 auto runner = pred;
-                while(runner != get_idom(bb)){
+                while (runner != get_idom(bb)) {
                     dom_frontier_[runner].insert(bb);
                     runner = get_idom(runner);
                 }
@@ -97,10 +102,26 @@ void Dominators::create_dominance_frontier(Function *f) {
 
 void Dominators::create_dom_tree_succ(Function *f) {
     // 分析得到 f 中各个基本块的支配树后继
-    for (auto &bb1 : f->get_basic_blocks()){
+    for (auto &bb1 : f->get_basic_blocks()) {
         auto bb = &bb1;
-        if(get_idom(bb) != nullptr && get_idom(bb) != bb){
+        if (get_idom(bb) != nullptr && get_idom(bb) != bb) {
             dom_tree_succ_blocks_[get_idom(bb)].insert(bb);
         }
     }
+}
+
+void Dominators::create_dom_dfs_order(Function *f) {
+    // 分析得到 f 中各个基本块的支配树上的dfs序L,R
+    unsigned int order = 0;
+    std::function<void(BasicBlock *)> dfs = [&](BasicBlock *bb) {
+        dom_tree_L_[bb] = ++ order;
+        dom_dfs_order_.push_back(bb);
+        for (auto &succ : dom_tree_succ_blocks_[bb]) {
+            dfs(succ);
+        }
+        dom_tree_R_[bb] = order;
+    };
+    dfs(f->get_entry_block());
+    dom_post_order_ =
+        std::vector(dom_dfs_order_.rbegin(), dom_dfs_order_.rend());
 }
