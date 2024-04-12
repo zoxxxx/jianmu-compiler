@@ -140,8 +140,10 @@ void LoopInvariantCodeMotion::run_on_loop(std::shared_ptr<Loop> loop) {
 
     // insert preheader br to header
     preheader->add_instruction(BranchInst::create_br(loop->get_header(), preheader));
+    preheader->add_succ_basic_block(loop->get_header());
+    loop->get_header()->add_pre_basic_block(preheader);
 
-    // insert preheader to parent
+    // insert preheader to parent loop
     if(loop->get_parent() != nullptr) {
         loop->get_parent()->add_block(preheader);
     }
