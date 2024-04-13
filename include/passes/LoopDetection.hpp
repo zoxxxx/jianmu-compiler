@@ -1,3 +1,5 @@
+#pragma once
+#include "Dominators.hpp"
 #include "PassManager.hpp"
 #include <memory>
 #include <unordered_map>

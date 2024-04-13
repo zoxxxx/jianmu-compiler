@@ -4,6 +4,7 @@
 #include "Module.hpp"
 
 #include <cassert>
+#include <iostream>
 
 BasicBlock::BasicBlock(Module *m, const std::string &name = "",
                        Function *parent = nullptr)

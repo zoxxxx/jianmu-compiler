@@ -623,7 +623,6 @@ void InstructionSelector::gen_phi() {
                     return inst->get_tag() == MachineInstr::Tag::B ||
                            inst->get_tag() == MachineInstr::Tag::BNEZ;
                 }));
-
             builder->insert_instr(MachineInstr::Tag::MOV,
                                   {tmp_reg, get_reg(op)});
             builder->set_insert_point(context.machine_bb, res);

@@ -1,16 +1,19 @@
 #include "BasicBlock.hpp"
 #include "Constant.hpp"
+#include "Function.hpp"
 #include "GlobalVariable.hpp"
 #include "Instruction.hpp"
 #include "LICM.hpp"
 #include "PassManager.hpp"
+#include <cstddef>
 #include <memory>
 
 void LoopInvariantCodeMotion::run() {
 
     loop_detection_ = std::make_unique<LoopDetection>(m_);
     loop_detection_->run();
-
+    func_info_ = std::make_unique<FuncInfo>(m_);
+    func_info_->run();
     for (auto &loop : loop_detection_->get_loops()) {
         is_loop_done_[loop] = false;
     }
@@ -33,11 +36,33 @@ void LoopInvariantCodeMotion::traverse_loop(std::shared_ptr<Loop> loop) {
 
 void LoopInvariantCodeMotion::run_on_loop(std::shared_ptr<Loop> loop) {
     std::set<Value *> loop_exists;
-    for (auto &bb : loop->get_blocks()) {
-        for (auto &inst : bb->get_instructions()) {
-            loop_exists.insert(&inst);
-        }
-    }
+    std::set<Value *> updated_global;
+    bool has_not_pure_func = false;
+    std::function<void(std::shared_ptr<Loop>)> traverse =
+        [&](std::shared_ptr<Loop> loop) {
+            for (auto &sub_loop : loop->get_sub_loops()) {
+                traverse(sub_loop);
+            }
+            for (auto &bb : loop->get_blocks()) {
+                for (auto &inst : bb->get_instructions()) {
+                    loop_exists.insert(&inst);
+                    if (inst.get_instr_type() == Instruction::store) {
+                        auto *store_inst = dynamic_cast<StoreInst *>(&inst);
+                        if (auto *global = dynamic_cast<GlobalVariable *>(
+                                store_inst->get_lval())) {
+                            updated_global.insert(global);
+                        }
+                    }
+                    if (inst.get_instr_type() == Instruction::call &&
+                        !func_info_->is_pure_function(dynamic_cast<Function *>(
+                            dynamic_cast<CallInst *>(&inst)->get_operand(0)))) {
+                        has_not_pure_func = true;
+                    }
+                }
+            }
+        };
+
+    traverse(loop);
 
     std::set<Value *> loop_invariant;
     bool changed;
@@ -50,20 +75,31 @@ void LoopInvariantCodeMotion::run_on_loop(std::shared_ptr<Loop> loop) {
                 auto inst_type = inst.get_instr_type();
                 if (inst_type == Instruction::alloca ||
                     inst_type == Instruction::store ||
-                    inst_type == Instruction::load ||
                     inst_type == Instruction::ret ||
                     inst_type == Instruction::br ||
                     inst_type == Instruction::phi)
                     continue;
-                // TODO handle call instruction after pure function analysis
-                if (inst_type == Instruction::call)
+
+                if (inst_type == Instruction::call &&
+                    !func_info_->is_pure_function(dynamic_cast<Function *>(
+                        dynamic_cast<CallInst *>(&inst)->get_operand(0))))
                     continue;
+
+                if (inst_type == Instruction::load) {
+                    if (dynamic_cast<GlobalVariable *>(
+                            dynamic_cast<LoadInst *>(&inst)->get_lval()) ==
+                            nullptr ||
+                        updated_global.find(
+                            dynamic_cast<LoadInst *>(&inst)->get_lval()) !=
+                            updated_global.end() ||
+                        has_not_pure_func)
+                        continue;
+                }
 
                 bool is_invariant = true;
                 for (auto &op : inst.get_operands()) {
                     if ((loop_exists.find(op) != loop_exists.end() &&
-                         loop_invariant.find(op) == loop_invariant.end()) ||
-                        dynamic_cast<GlobalVariable *>(op) != nullptr) {
+                         loop_invariant.find(op) == loop_invariant.end())) {
                         is_invariant = false;
                         break;
                     }
@@ -82,6 +118,9 @@ void LoopInvariantCodeMotion::run_on_loop(std::shared_ptr<Loop> loop) {
             BasicBlock::create(m_, "", loop->get_header()->get_parent()));
     }
 
+    if (loop_invariant.empty())
+        return;
+
     // insert preheader
     auto preheader = loop->get_preheader();
 
@@ -91,18 +130,21 @@ void LoopInvariantCodeMotion::run_on_loop(std::shared_ptr<Loop> loop) {
             break;
         auto *phi_inst = dynamic_cast<PhiInst *>(&phi_inst_);
 
-        auto *new_phi_inst = PhiInst::create_phi(phi_inst->get_type(), preheader);
-        std::vector<std::pair<Value *, Value *>> to_move; 
+        std::vector<std::pair<Value *, Value *>> to_move;
         for (unsigned i = 0; i < phi_inst->get_num_operand(); i += 2) {
             auto *val = phi_inst->get_operand(i);
             auto *bb = dynamic_cast<BasicBlock *>(phi_inst->get_operand(i + 1));
-            if(loop->get_back_edges_nodes().find(bb) == loop->get_back_edges_nodes().end())
+            if (loop->get_back_edges_nodes().find(bb) !=
+                loop->get_back_edges_nodes().end())
                 continue;
             to_move.push_back({val, bb});
         }
 
-        if(to_move.size() == 0)
+        if (to_move.size() == 0)
             continue;
+        auto *new_phi_inst =
+            PhiInst::create_phi(phi_inst->get_type(), preheader);
+        preheader->add_instruction(new_phi_inst);
 
         for (auto &pair : to_move) {
             phi_inst->remove_phi_operand(pair.second);
@@ -110,13 +152,13 @@ void LoopInvariantCodeMotion::run_on_loop(std::shared_ptr<Loop> loop) {
         }
 
         phi_inst->add_phi_pair_operand(new_phi_inst, preheader);
-        preheader->add_instruction(new_phi_inst);
     }
 
     // rebuild cfg and br instruction
     std::vector<BasicBlock *> pred_to_remove;
     for (auto &pred : loop->get_header()->get_pre_basic_blocks()) {
-        if (loop->get_back_edges_nodes().find(pred) != loop->get_back_edges_nodes().end())
+        if (loop->get_back_edges_nodes().find(pred) !=
+            loop->get_back_edges_nodes().end())
             continue;
         auto *term = pred->get_terminator();
         for (unsigned i = 0; i < term->get_num_operand(); i++) {
@@ -126,6 +168,7 @@ void LoopInvariantCodeMotion::run_on_loop(std::shared_ptr<Loop> loop) {
         }
         pred->remove_succ_basic_block(loop->get_header());
         pred->add_succ_basic_block(preheader);
+        preheader->add_pre_basic_block(pred);
         pred_to_remove.push_back(pred);
     }
 
@@ -134,17 +177,17 @@ void LoopInvariantCodeMotion::run_on_loop(std::shared_ptr<Loop> loop) {
     }
 
     // insert loop invariant
-    for (auto &inst : loop_invariant) {
-        preheader->add_instruction(dynamic_cast<Instruction *>(inst));
+    for (auto &inst_ : loop_invariant) {
+        auto *inst = dynamic_cast<Instruction *>(inst_);
+        inst->get_parent()->remove_instr(inst);
+        preheader->add_instruction(inst);
     }
 
     // insert preheader br to header
-    preheader->add_instruction(BranchInst::create_br(loop->get_header(), preheader));
-    preheader->add_succ_basic_block(loop->get_header());
-    loop->get_header()->add_pre_basic_block(preheader);
+    BranchInst::create_br(loop->get_header(), preheader);
 
     // insert preheader to parent loop
-    if(loop->get_parent() != nullptr) {
+    if (loop->get_parent() != nullptr) {
         loop->get_parent()->add_block(preheader);
     }
 }

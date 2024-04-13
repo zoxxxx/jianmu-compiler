@@ -2,6 +2,8 @@
 #include "Dominators.hpp"
 
 void Dominators::run_on_func(Function *f) {
+    dom_post_order_.clear();
+    dom_dfs_order_.clear();
     if (f->get_basic_blocks().size() == 0)
         return;
     for (auto &bb1 : f->get_basic_blocks()) {

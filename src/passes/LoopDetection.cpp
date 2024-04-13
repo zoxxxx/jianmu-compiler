@@ -24,7 +24,7 @@ void LoopDetection::discover_loop_and_sub_loops(BasicBlock *bb,
             for (auto &pred : bb->get_pre_basic_blocks()) {
                 work_list.push_back(pred);
             }
-        } else {
+        } else if(bb_to_loop_[bb] != loop) {
             auto sub_loop = bb_to_loop_[bb];
             while(sub_loop->get_parent() != nullptr) {
                 sub_loop = sub_loop->get_parent();

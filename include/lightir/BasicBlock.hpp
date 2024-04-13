@@ -39,7 +39,11 @@ class BasicBlock : public Value, public llvm::ilist_node<BasicBlock> {
     /****************api about Instruction****************/
     void add_instruction(Instruction *instr);
     void add_instr_begin(Instruction *instr) { instr_list_.push_front(instr); }
+
+    // the difference between erase and remove is that erase will delete the
+    // instruction, remove will only remove the instruction from the list 
     void erase_instr(Instruction *instr) { instr_list_.erase(instr); }
+    void remove_instr(Instruction *instr) { instr_list_.remove(instr); }
 
     llvm::ilist<Instruction> &get_instructions() { return instr_list_; }
     bool empty() const { return instr_list_.empty(); }
