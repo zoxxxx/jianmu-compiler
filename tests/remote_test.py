@@ -65,6 +65,8 @@ with open(log_file, "w") as log:
         case_base_name = case_path.stem
         asm_file = output_dir / f"{case_base_name}.s"
         log_json[case_base_name] = {}
+        # if(case_base_name.find("21") == -1):
+            # continue
 
         log.write(f"[info] Testing {case_base_name}\n")
         print(f"[info] Testing {case_base_name}")
@@ -74,7 +76,10 @@ with open(log_file, "w") as log:
             result = subprocess.run(f"sed -i '1i #include \"/home/zox/compiler/2023ustc-jianmu-compiler/src/sylib/sylib.c\"' {c_file}", shell=True, text=True, capture_output=True)
             result = subprocess.run(f"sed -i '1i #include \"/home/zox/compiler/2023ustc-jianmu-compiler/src/sylib/sylib.h\"' {c_file}", shell=True, text=True, capture_output=True)
 
-            result = subprocess.run(f"timeout {timeout} loongarch64-unknown-linux-gnu-g++ -O3 -static -S {c_file} -o {asm_file} >&2", shell=True, text=True, capture_output=True)
+            if(case_base_name.find("conv") == -1):
+                result = subprocess.run(f"timeout {timeout} loongarch64-unknown-linux-gnu-g++ -O2 -static -S {c_file} -o {asm_file} >&2", shell=True, text=True, capture_output=True)
+            else :
+                result = subprocess.run(f"timeout {timeout} loongarch64-unknown-linux-gnu-gcc -O2 -static -S {c_file} -o {asm_file} >&2", shell=True, text=True, capture_output=True)
             print(result.stderr)
         elif compiler == "cminusfc":
             result = subprocess.run(f"timeout {timeout} cminusfc -S -mem2reg {case_path} -o {asm_file} >&2", shell=True, text=True, capture_output=True)

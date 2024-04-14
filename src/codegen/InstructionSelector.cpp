@@ -219,6 +219,7 @@ void InstructionSelector::gen_prologue_epilogue() {
         -context.machine_func->frame_scheduler->get_frame_size());
     // add a nop instruction to mark the pos of frame set
     // which will be removed later
+    builder->set_flag(MachineInstr::Flag::IS_FRAME_SET | MachineInstr::Flag::IS_RESERVED);
     builder->insert_instr(MachineInstr::Tag::MOV,
                           {PhysicalRegister::zero(), PhysicalRegister::zero()});
     builder->set_flag(0);

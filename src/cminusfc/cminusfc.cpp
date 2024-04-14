@@ -14,6 +14,7 @@
 #include "RegisterAllocation.hpp"
 #include "cminusf_builder.hpp"
 #include "LICM.hpp"
+#include "MIDCE.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -85,6 +86,7 @@ int main(int argc, char **argv) {
         auto MPM = std::make_shared<MachinePassManager>(MM);
         MPM->add_pass<InstructionSelector>();
         MPM->add_pass<PeepholeOptimization>();
+        MPM->add_pass<MIDeadCodeElimination>();
         MPM->add_pass<RegisterAllocation>();
         MPM->run();
         output_stream << MM->print();

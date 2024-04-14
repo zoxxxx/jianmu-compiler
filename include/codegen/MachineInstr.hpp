@@ -96,11 +96,13 @@ class MachineInstr : public std::enable_shared_from_this<MachineInstr> {
         IS_FUNC_ARGS_SET = 1<<0,
         IS_FRAME_SET = 1<<1,
         IS_PHI_MOV = 1<<2,
+        IS_RESERVED = 1<<3
     };
     bool is_func_args_set() const {return flag & Flag::IS_FUNC_ARGS_SET; }
     bool is_frame_set() const { return flag & Flag::IS_FRAME_SET; }
     bool is_phi_mov() const { return flag & Flag::IS_PHI_MOV;}
-    
+    bool is_reserved() const { return flag & Flag::IS_RESERVED; }
+
     bool has_dst() const;
     std::shared_ptr<Operand> get_operand(unsigned index) const; 
     std::shared_ptr<Register> get_dst() const ;

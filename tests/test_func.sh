@@ -127,7 +127,7 @@ for case in $testcases; do
 		fi
 	else
 		# For ll mode, use llc and clang to compile and run .ll file
-		opt --instcombine "$ll_file" -o "$ll_file" >>$LOG 2>&1
+		# opt --instcombine "$ll_file" -o "$ll_file" >>$LOG 2>&1
 		timeout $timeout llc "$ll_file" -O0 -filetype=obj -o "$output_dir/$case_base_name.o" >>$LOG 2>&1
 		check_compile_time $? "TLE" "llc compiler error" || continue
 		check_return_value $? 0 "CE" "llc compiler error" || continue

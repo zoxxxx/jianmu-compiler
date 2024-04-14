@@ -5,7 +5,7 @@
             "label": "qemu-static",
             "type": "shell",
             "isBackground": true,
-            "command": "/opt/qemu/bin/qemu-loongarch64 -g 1234 /home/zox/compiler/2023ustc-jianmu-compiler/tests/output/87_many_params",
+            "command": "/opt/qemu/bin/qemu-loongarch64 -g 1234 /home/zox/compiler/2023ustc-jianmu-compiler/tests/output/29_long_line",
             "problemMatcher": [
                 {
                 "pattern": [

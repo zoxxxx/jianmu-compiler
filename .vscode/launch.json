@@ -10,14 +10,14 @@
             "request": "launch",
             "name": "Debug",
             "program": "cminusfc",
-            "args": ["/home/zox/compiler/2023ustc-jianmu-compiler/tests/functional/00_main.sy", "-mem2reg", "-S", "-o", "/home/zox/compiler/2023ustc-jianmu-compiler/tests/output/00_main.s"],
-            "cwd": "${workspaceFolder}/build",
+            "args": ["/home/zox/compiler/2023ustc-jianmu-compiler/tests/functional/21_if_test2.sy", "-mem2reg", "-S", "-o", "/home/zox/compiler/2023ustc-jianmu-compiler/test.s"],
+            "cwd": "${workspaceFolder}/build"
         },
         {
             "type": "cppdbg",
             "request": "launch",
             "name": "assembly",
-            "program": "/home/zox/compiler/2023ustc-jianmu-compiler/tests/output/87_many_params",
+            "program": "/home/zox/compiler/2023ustc-jianmu-compiler/tests/output/29_long_line",
             "args": [],
             "cwd": "/home/zox/compiler/2023ustc-jianmu-compiler/tests/output/",
             "MIMode": "gdb",

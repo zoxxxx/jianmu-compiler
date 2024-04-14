@@ -1,7 +1,7 @@
 #include "MachineBasicBlock.hpp"
+#include "MachineFunction.hpp"
 #include "MachineInstr.hpp"
 #include "Operand.hpp"
-#include "MachineFunction.hpp"
 #include "ast.hpp"
 #include <cstddef>
 #include <memory>
